@@ -1,0 +1,13 @@
+{
+  "name": "DailyTasks CCH",
+  "short_name": "DailyTasks",
+  "description": "Pendientes diarios de la Cámara de Comercio de Huancayo",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F6FA",
+  "theme_color": "#1D1F6E",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
