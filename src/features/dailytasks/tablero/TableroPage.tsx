@@ -6,12 +6,11 @@ import {
   Card,
   CardContent,
   Chip,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
+  FormControlLabel,
   Snackbar,
   Stack,
+  Switch,
+  TextField,
   Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -31,7 +30,6 @@ import {
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, format, parseISO } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { changeTaskStatus, getBoard } from '../../../api';
@@ -43,8 +41,8 @@ import PageLoader from '../../../components/common/PageLoader';
 import ConfirmDialog from '../../../components/dailytasks/ConfirmDialog';
 import TaskCard from '../../../components/dailytasks/TaskCard';
 import TaskQuickViewDrawer from '../../../components/dailytasks/TaskQuickViewDrawer';
-import { brand, colors, taskStatus } from '../../../theme/tokens';
-import { formatDueDate, todayLima } from '../../../utils/format';
+import { colors, taskStatus } from '../../../theme/tokens';
+import { formatDueDate, plural, todayLima } from '../../../utils/format';
 import TaskFormDialog from '../lista/TaskFormDialog';
 
 const COLUMNS: Array<{ key: DailyTaskStatus; title: string }> = [
@@ -240,9 +238,18 @@ export default function TableroPage() {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
 
-  const dueDate = params.get('dueDate') ?? '';
-  const scope = params.get('scope') === 'all' ? 'all' : 'today';
-  const [daysAhead, setDaysAhead] = useState(0);
+  const today = todayLima();
+  const allDates = params.get('scope') === 'all';
+  const dueDateParam = params.get('dueDate') ?? '';
+  const dateFromParam = params.get('dueFrom') ?? dueDateParam;
+  const dateToParam = params.get('dueTo') ?? dueDateParam;
+  const hasExplicitDate = Boolean(dueDateParam || dateFromParam || dateToParam);
+  const defaultDate = !allDates && !hasExplicitDate ? today : '';
+  const dueFrom = dateFromParam || defaultDate;
+  const dueTo = dateToParam || defaultDate;
+  const includeOverdue = params.get('includeOverdue') === 'true';
+  const onlyToday = !allDates && dueFrom === today && dueTo === today;
+  const hasDateFilter = Boolean(dueFrom || dueTo);
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [overStatus, setOverStatus] = useState<DailyTaskStatus | null>(null);
   const [pendingDone, setPendingDone] = useState<DailyTaskCard | null>(null);
@@ -257,12 +264,26 @@ export default function TableroPage() {
     }),
   );
 
-  const today = todayLima();
-  const horizon = format(addDays(parseISO(today), daysAhead), 'yyyy-MM-dd');
+  const rangeLabel = onlyToday
+    ? 'Hoy'
+    : dueFrom && dueTo
+      ? dueFrom === dueTo
+        ? formatDueDate(dueFrom)
+        : `Del ${formatDueDate(dueFrom)} al ${formatDueDate(dueTo)}`
+      : dueFrom
+        ? `Desde ${formatDueDate(dueFrom)}`
+        : dueTo
+          ? `Hasta ${formatDueDate(dueTo)}`
+          : 'Todas las fechas';
 
   const filters = useMemo(
-    () => (dueDate ? { dueDate } : scope === 'all' ? {} : { dueTo: horizon }),
-    [dueDate, scope, horizon],
+    () => ({
+      dueFrom: dueFrom || undefined,
+      dueTo: dueTo || undefined,
+      includeOverdue: includeOverdue || undefined,
+      overdue: !includeOverdue && (dueFrom || dueTo) ? false : undefined,
+    }),
+    [dueFrom, dueTo, includeOverdue],
   );
 
   const boardQuery = useQuery({
@@ -303,17 +324,42 @@ export default function TableroPage() {
     },
   });
 
-  const setScope = (next: 'today' | 'all') => {
+  const setRange = (from: string, to: string) => {
     const nextParams = new URLSearchParams(params);
-    if (next === 'all') nextParams.set('scope', 'all');
-    else nextParams.delete('scope');
     nextParams.delete('dueDate');
+    nextParams.delete('scope');
+    nextParams.delete('page');
+    if (from) nextParams.set('dueFrom', from);
+    else nextParams.delete('dueFrom');
+    if (to) nextParams.set('dueTo', to);
+    else nextParams.delete('dueTo');
     setParams(nextParams, { replace: true });
   };
 
-  const clearDueDate = () => {
+  const changeFrom = (value: string) => {
+    const nextTo = value && dueTo && value > dueTo ? value : dueTo;
+    setRange(value, nextTo);
+  };
+
+  const changeTo = (value: string) => {
+    const nextFrom = value && dueFrom && value < dueFrom ? value : dueFrom;
+    setRange(nextFrom, value);
+  };
+
+  const clearDateFilters = () => {
     const nextParams = new URLSearchParams(params);
     nextParams.delete('dueDate');
+    nextParams.delete('dueFrom');
+    nextParams.delete('dueTo');
+    nextParams.delete('includeOverdue');
+    nextParams.set('scope', 'all');
+    setParams(nextParams, { replace: true });
+  };
+
+  const toggleOverdue = (checked: boolean) => {
+    const nextParams = new URLSearchParams(params);
+    if (checked) nextParams.set('includeOverdue', 'true');
+    else nextParams.delete('includeOverdue');
     setParams(nextParams, { replace: true });
   };
 
@@ -424,72 +470,89 @@ export default function TableroPage() {
           </Typography>
           <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.45rem', md: '1.65rem' } }}>Tablero</Typography>
           <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.75 }}>
-            <Chip size="small" label={`${total} pendientes`} sx={{ bgcolor: colors.bgSubtle, fontWeight: 700 }} />
-            {dueDate ? (
-              <Chip
-                size="small"
-                color="primary"
-                variant="outlined"
-                label={`Vencimiento ${formatDueDate(dueDate)}`}
-                onDelete={clearDueDate}
-              />
-            ) : (
-              <Chip
-                size="small"
-                label={scope === 'all' ? 'Todos los pendientes' : `Hasta ${formatDueDate(horizon)}`}
-                sx={{ bgcolor: colors.infoSoft, color: colors.info, fontWeight: 700 }}
-              />
+            <Chip size="small" label={plural(total, 'tarea', 'tareas')} sx={{ bgcolor: colors.bgSubtle, fontWeight: 700 }} />
+            <Chip
+              size="small"
+              color={hasDateFilter ? 'primary' : 'default'}
+              variant={hasDateFilter ? 'outlined' : 'filled'}
+              label={rangeLabel}
+              onDelete={hasDateFilter ? clearDateFilters : undefined}
+            />
+            {hasDateFilter && includeOverdue && (
+              <Chip size="small" color="warning" variant="outlined" label="Incluye vencidas" />
             )}
           </Stack>
         </Box>
 
-        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-          {!dueDate && scope === 'today' && (
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="board-horizon">Fecha</InputLabel>
-              <Select
-                labelId="board-horizon"
-                label="Próximos"
-                value={daysAhead}
-                onChange={(e) => setDaysAhead(Number(e.target.value))}
-              >
-                <MenuItem value={0}>Hoy</MenuItem>
-                <MenuItem value={3}>3 días</MenuItem>
-                <MenuItem value={7}>7 días</MenuItem>
-                <MenuItem value={14}>14 días</MenuItem>
-              </Select>
-            </FormControl>
-          )}
-          <Button variant="outlined" onClick={() => setScope(scope === 'today' ? 'all' : 'today')}>
-            {scope === 'today' ? 'Ver todos' : 'Volver a hoy'}
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddRoundedIcon />}
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          >
-            Nuevo pendiente
-          </Button>
-        </Stack>
+        <Button
+          variant="contained"
+          startIcon={<AddRoundedIcon />}
+          onClick={() => {
+            setEditing(null);
+            setFormOpen(true);
+          }}
+        >
+          Nuevo pendiente
+        </Button>
       </Stack>
 
-      {dueDate ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Vista del {formatDueDate(dueDate)}. La columna Completados del día muestra solo las tareas cerradas ese día.
-        </Typography>
-      ) : scope === 'today' ? (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Muestra las tareas vencidas, las de hoy y las de los próximos {daysAhead} días. Arrastra solo tus tareas.
-          La columna Completados del día muestra solo los cierres de hoy.
-        </Typography>
-      ) : (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Vista general de pendientes. La columna Completados del día muestra solo las tareas cerradas hoy.
-        </Typography>
-      )}
+      <Card variant="outlined" sx={{ mb: 2, boxShadow: 'none' }}>
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={1.25}
+            alignItems={{ xs: 'stretch', md: 'center' }}
+            sx={{ flexWrap: 'wrap', rowGap: 1.25 }}
+          >
+            <Button
+              size="small"
+              variant={onlyToday ? 'contained' : 'outlined'}
+              onClick={() => setRange(today, today)}
+            >
+              Hoy
+            </Button>
+            <TextField
+              label="Desde"
+              type="date"
+              size="small"
+              value={dueFrom}
+              onChange={(event) => changeFrom(event.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: { xs: '100%', sm: 160 } }}
+            />
+            <TextField
+              label="Hasta"
+              type="date"
+              size="small"
+              value={dueTo}
+              onChange={(event) => changeTo(event.target.value)}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: { xs: '100%', sm: 160 } }}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={includeOverdue}
+                  disabled={!hasDateFilter}
+                  onChange={(event) => toggleOverdue(event.target.checked)}
+                />
+              }
+              label="Incluir vencidas"
+            />
+            <Box sx={{ flex: 1 }} />
+            <Button size="small" variant="text" onClick={clearDateFilters} disabled={!hasDateFilter}>
+              Ver todos
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {hasDateFilter
+          ? `${onlyToday ? 'Solo tareas de hoy' : rangeLabel}${includeOverdue ? ' · incluye vencidas' : ' · sin vencidas'}.`
+          : 'Todas las fechas.'}{' '}
+        La columna Completados del día muestra los cierres del día.
+      </Typography>
 
       <DndContext
         sensors={sensors}
