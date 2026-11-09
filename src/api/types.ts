@@ -231,7 +231,6 @@ export interface DailyTaskQuery {
   dueTo?: string;
   dueDate?: string;
   overdue?: boolean;
-  includeOverdue?: boolean;
   q?: string;
   updatedSince?: string;
   page?: number;

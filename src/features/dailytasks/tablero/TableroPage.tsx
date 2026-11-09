@@ -48,7 +48,7 @@ import TaskFormDialog from '../lista/TaskFormDialog';
 const COLUMNS: Array<{ key: DailyTaskStatus; title: string }> = [
   { key: 'Pending', title: 'Pendiente' },
   { key: 'InProgress', title: 'En progreso' },
-  { key: 'Done', title: 'Completados del día' },
+  { key: 'Done', title: 'Completados' },
 ];
 
 /** Desplaza la tarjeta flotante para no tapar la vista previa de la columna. */
@@ -258,6 +258,15 @@ export default function TableroPage() {
   const [editing, setEditing] = useState<DailyTask | null>(null);
   const [toast, setToast] = useState('');
 
+  useEffect(() => {
+    if (params.get('nuevo') !== '1') return;
+    setEditing(null);
+    setFormOpen(true);
+    const next = new URLSearchParams(params);
+    next.delete('nuevo');
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 },
@@ -280,7 +289,6 @@ export default function TableroPage() {
     () => ({
       dueFrom: dueFrom || undefined,
       dueTo: dueTo || undefined,
-      includeOverdue: includeOverdue || undefined,
       overdue: !includeOverdue && (dueFrom || dueTo) ? false : undefined,
     }),
     [dueFrom, dueTo, includeOverdue],
@@ -327,12 +335,20 @@ export default function TableroPage() {
   const setRange = (from: string, to: string) => {
     const nextParams = new URLSearchParams(params);
     nextParams.delete('dueDate');
-    nextParams.delete('scope');
     nextParams.delete('page');
-    if (from) nextParams.set('dueFrom', from);
-    else nextParams.delete('dueFrom');
-    if (to) nextParams.set('dueTo', to);
-    else nextParams.delete('dueTo');
+
+    if (!from && !to) {
+      nextParams.set('scope', 'all');
+      nextParams.delete('dueFrom');
+      nextParams.delete('dueTo');
+    } else {
+      nextParams.delete('scope');
+      if (from) nextParams.set('dueFrom', from);
+      else nextParams.delete('dueFrom');
+      if (to) nextParams.set('dueTo', to);
+      else nextParams.delete('dueTo');
+    }
+
     setParams(nextParams, { replace: true });
   };
 
@@ -479,7 +495,7 @@ export default function TableroPage() {
               onDelete={hasDateFilter ? clearDateFilters : undefined}
             />
             {hasDateFilter && includeOverdue && (
-              <Chip size="small" color="warning" variant="outlined" label="Incluye vencidas" />
+              <Chip size="small" color="warning" variant="outlined" label="Incluye vencidas del rango" />
             )}
           </Stack>
         </Box>
@@ -509,7 +525,7 @@ export default function TableroPage() {
               variant={onlyToday ? 'contained' : 'outlined'}
               onClick={() => setRange(today, today)}
             >
-              Hoy
+              Solo hoy
             </Button>
             <TextField
               label="Desde"
@@ -549,9 +565,11 @@ export default function TableroPage() {
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         {hasDateFilter
-          ? `${onlyToday ? 'Solo tareas de hoy' : rangeLabel}${includeOverdue ? ' · incluye vencidas' : ' · sin vencidas'}.`
+          ? `${onlyToday ? 'Solo tareas de hoy' : rangeLabel}${includeOverdue ? ' · incluye vencidas del rango' : ' · sin vencidas'}.`
           : 'Todas las fechas.'}{' '}
-        La columna Completados del día muestra los cierres del día.
+        {hasDateFilter
+          ? 'Los completados se muestran por fecha de cierre dentro del rango.'
+          : 'Se muestran todos los completados.'}
       </Typography>
 
       <DndContext

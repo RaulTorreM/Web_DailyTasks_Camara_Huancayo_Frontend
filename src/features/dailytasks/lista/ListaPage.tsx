@@ -4,7 +4,9 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import ExpandLessRoundedIcon from '@mui/icons-material/ExpandLessRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import FilterAltOffRoundedIcon from '@mui/icons-material/FilterAltOffRounded';
+import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import HistoryRoundedIcon from '@mui/icons-material/HistoryRounded';
+import PersonOutlineRoundedIcon from '@mui/icons-material/PersonOutlineRounded';
 import SearchOffRoundedIcon from '@mui/icons-material/SearchOffRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
@@ -45,8 +47,8 @@ import { useQuery } from '@tanstack/react-query';
 import { addDays, format, parseISO, startOfWeek } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { listAllTasks, listAreas, listTasks, listUsers } from '../../../api';
+import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { listAllTasks, listTasks } from '../../../api';
 import type { DailyTask, DailyTaskPriority, DailyTaskStatus } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
@@ -58,7 +60,7 @@ import InlineTaskControls from '../../../components/dailytasks/InlineTaskControl
 import TaskCard from '../../../components/dailytasks/TaskCard';
 import TaskQuickViewDrawer from '../../../components/dailytasks/TaskQuickViewDrawer';
 import { useDebounced } from '../../../hooks/useDebounced';
-import { colors, ownTask } from '../../../theme/tokens';
+import { colors } from '../../../theme/tokens';
 import { formatDueDate, plural, todayLima } from '../../../utils/format';
 import { priorityLabel, priorityOrder, statusLabel, statusOrder } from '../../../utils/labels';
 import TaskFormDialog from './TaskFormDialog';
@@ -70,31 +72,30 @@ interface TaskTableProps {
   onOpen: (task: DailyTask) => void;
   onEdit: (task: DailyTask) => void;
   onToast: (message: string) => void;
+  showAssignee?: boolean;
 }
 
-function TaskTable({ tasks, onOpen, onEdit, onToast }: TaskTableProps) {
+function TaskTable({ tasks, onOpen, onEdit, onToast, showAssignee = false }: TaskTableProps) {
   const theme = useTheme();
   const { session } = useAuth();
-  const manager = isManager(session);
 
   return (
     <Card variant="outlined" sx={{ display: { xs: 'none', md: 'block' } }}>
       <TableContainer>
-        <Table size="small" sx={{ minWidth: 940 }}>
+        <Table size="small" sx={{ minWidth: showAssignee ? 940 : 820 }}>
           <TableHead>
             <TableRow>
               <TableCell>Código</TableCell>
               <TableCell>Pendiente</TableCell>
               <TableCell>Estado / prioridad</TableCell>
               <TableCell>Área</TableCell>
-              <TableCell>Responsable</TableCell>
+              {showAssignee && <TableCell>Responsable</TableCell>}
               <TableCell>Vence</TableCell>
               <TableCell align="right">Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {tasks.map((task) => {
-              const isOwn = !manager && task.assignedToId === session?.id;
               const editable = canEditTask(session, task);
               return (
                 <TableRow
@@ -103,11 +104,7 @@ function TaskTable({ tasks, onOpen, onEdit, onToast }: TaskTableProps) {
                   onClick={() => onOpen(task)}
                   sx={{
                     cursor: 'pointer',
-                    bgcolor: isOwn ? ownTask.bg : undefined,
-                    '& td:first-of-type': {
-                      borderLeft: isOwn ? `3px solid ${ownTask.border}` : '3px solid transparent',
-                    },
-                    '&:hover': { bgcolor: isOwn ? alpha(ownTask.border, 0.14) : theme.palette.action.hover },
+                    '&:hover': { bgcolor: theme.palette.action.hover },
                   }}
                 >
                   <TableCell sx={{ whiteSpace: 'nowrap', color: theme.palette.text.secondary, fontWeight: 800 }}>
@@ -132,12 +129,14 @@ function TaskTable({ tasks, onOpen, onEdit, onToast }: TaskTableProps) {
                     />
                   </TableCell>
                   <TableCell sx={{ fontSize: '.8rem' }}>{task.areaName}</TableCell>
-                  <TableCell>
-                    <AssigneeBadge
-                      name={task.assignedToName}
-                      isCurrentUser={task.assignedToId === session?.id}
-                    />
-                  </TableCell>
+                  {showAssignee && (
+                    <TableCell>
+                      <AssigneeBadge
+                        name={task.assignedToName}
+                        isCurrentUser={task.assignedToId === session?.id}
+                      />
+                    </TableCell>
+                  )}
                   <TableCell
                     sx={{
                       whiteSpace: 'nowrap',
@@ -192,16 +191,43 @@ interface TaskGroupProps {
   onOpen: (task: DailyTask) => void;
   onEdit: (task: DailyTask) => void;
   onToast: (message: string) => void;
+  showAssignee?: boolean;
 }
 
-function TaskGroup({ title, subtitle, tone, icon, tasks, onOpen, onEdit, onToast }: TaskGroupProps) {
+function TaskGroup({ title, subtitle, tone, icon, tasks, onOpen, onEdit, onToast, showAssignee = false }: TaskGroupProps) {
   const theme = useTheme();
   if (tasks.length === 0) return null;
 
   return (
     <Box>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
-        <Box sx={{ color: tone, display: 'flex' }}>{icon}</Box>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{
+          mb: 1.25,
+          p: { xs: 1, sm: 1.15 },
+          borderRadius: 2,
+          bgcolor: alpha(tone, 0.06),
+          border: `1px solid ${alpha(tone, 0.16)}`,
+          flexWrap: 'wrap',
+          rowGap: 0.75,
+        }}
+      >
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            borderRadius: 1.5,
+            bgcolor: alpha(tone, 0.14),
+            color: tone,
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {icon}
+        </Box>
         <Typography sx={{ fontWeight: 800, fontSize: '.98rem', color: theme.palette.text.primary }}>{title}</Typography>
         <Chip
           size="small"
@@ -212,7 +238,7 @@ function TaskGroup({ title, subtitle, tone, icon, tasks, onOpen, onEdit, onToast
           {subtitle}
         </Typography>
       </Stack>
-      <TaskTable tasks={tasks} onOpen={onOpen} onEdit={onEdit} onToast={onToast} />
+      <TaskTable tasks={tasks} onOpen={onOpen} onEdit={onEdit} onToast={onToast} showAssignee={showAssignee} />
       <TaskCards tasks={tasks} onOpen={onOpen} />
     </Box>
   );
@@ -226,8 +252,14 @@ export default function ListaPage() {
 
   const view = params.get('view') === 'all' ? 'all' : 'today';
   const today = todayLima();
+  const assignedToId = params.get('assignedToId') ?? '';
+  const visibleAssigneeId = manager
+    ? assignedToId
+      ? Number(assignedToId)
+      : undefined
+    : session?.id;
+  const isPersonalView = !manager || (assignedToId !== '' && Number(assignedToId) === session?.id);
   const [daysAhead, setDaysAhead] = useState(3);
-  const [onlyMine, setOnlyMine] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(false);
 
   const qFromUrl = params.get('q') ?? '';
@@ -241,8 +273,6 @@ export default function ListaPage() {
 
   const status = (params.get('status') as DailyTaskStatus | null) ?? '';
   const priority = (params.get('priority') as DailyTaskPriority | null) ?? '';
-  const area = params.get('area') ?? '';
-  const assignedToId = params.get('assignedToId') ?? '';
   const dueDate = params.get('dueDate') ?? '';
   const overdue = params.get('overdue') === 'true';
   const sortBy = params.get('sortBy') ?? 'dueDate';
@@ -296,8 +326,7 @@ export default function ListaPage() {
       q: debouncedSearch || undefined,
       status: (status || undefined) as DailyTaskStatus | undefined,
       priority: (priority || undefined) as DailyTaskPriority | undefined,
-      area: area || undefined,
-      assignedToId: assignedToId ? Number(assignedToId) : undefined,
+      assignedToId: visibleAssigneeId,
       dueDate: dueDate || undefined,
       overdue: overdue || undefined,
       page,
@@ -305,7 +334,7 @@ export default function ListaPage() {
       sortBy,
       sortDir: 'asc' as const,
     }),
-    [debouncedSearch, status, priority, area, assignedToId, dueDate, overdue, page, sortBy],
+    [debouncedSearch, status, priority, visibleAssigneeId, dueDate, overdue, page, sortBy],
   );
 
   const todayQuery = useQuery({
@@ -313,24 +342,18 @@ export default function ListaPage() {
       view: 'today',
       horizon,
       q: debouncedSearch,
-      onlyMine,
-      assignedToId,
-      userId: session?.id,
+      assignee: visibleAssigneeId,
     }),
     queryFn: () =>
       listAllTasks({
         dueTo: horizon,
         q: debouncedSearch || undefined,
-        assignedToId: onlyMine
-          ? session?.id
-          : assignedToId
-            ? Number(assignedToId)
-            : undefined,
+        assignedToId: visibleAssigneeId,
         pageSize: 100,
         sortBy: 'dueDate',
         sortDir: 'asc',
       }),
-    enabled: view === 'today',
+    enabled: view === 'today' && session?.id != null,
   });
 
   const allQuery = useQuery({
@@ -341,38 +364,27 @@ export default function ListaPage() {
   });
 
   const completedQuery = useQuery({
-    queryKey: qk.tasks({ completedWeek: weekStart, onlyMine, userId: session?.id }),
+    queryKey: qk.tasks({ completedWeek: weekStart, assignee: visibleAssigneeId }),
     queryFn: () =>
       listAllTasks({
         status: 'Done',
         updatedSince: weekStartUtc,
-        assignedToId: onlyMine ? session?.id : undefined,
+        assignedToId: visibleAssigneeId,
         pageSize: 100,
         sortBy: 'dueDate',
         sortDir: 'desc',
       }),
-    enabled: view === 'today' && completedOpen,
-  });
-
-  const areasQuery = useQuery({
-    queryKey: qk.areas,
-    queryFn: () => listAreas(),
-    staleTime: 10 * 60_000,
-  });
-
-  const usersQuery = useQuery({
-    queryKey: qk.users(),
-    queryFn: () => listUsers(),
-    enabled: manager,
-    staleTime: 5 * 60_000,
+    enabled: view === 'today' && completedOpen && session?.id != null,
   });
 
   const activeTasks = useMemo(
     () =>
       (todayQuery.data ?? []).filter(
-        (task) => task.status !== 'Done' && (!onlyMine || task.assignedToId === session?.id),
+        (task) =>
+          task.status !== 'Done' &&
+          (visibleAssigneeId == null || task.assignedToId === visibleAssigneeId),
       ),
-    [todayQuery.data, onlyMine, session?.id],
+    [todayQuery.data, visibleAssigneeId],
   );
 
   const overdueTasks = activeTasks.filter((task) => task.dueDate < today);
@@ -386,9 +398,9 @@ export default function ListaPage() {
           task.completedOn != null &&
           task.completedOn >= weekStart &&
           task.completedOn <= today &&
-          (!onlyMine || task.assignedToId === session?.id),
+          (visibleAssigneeId == null || task.assignedToId === visibleAssigneeId),
       ),
-    [completedQuery.data, weekStart, today, onlyMine, session?.id],
+    [completedQuery.data, weekStart, today, visibleAssigneeId],
   );
 
   const openNew = () => {
@@ -423,7 +435,7 @@ export default function ListaPage() {
   };
 
   const hasFilters = Boolean(
-    qFromUrl || status || priority || area || assignedToId || dueDate || overdue || sortBy !== 'dueDate',
+    qFromUrl || status || priority || assignedToId || dueDate || overdue || sortBy !== 'dueDate',
   );
 
   const todayLoading = view === 'today' && todayQuery.isLoading && !todayQuery.data;
@@ -445,24 +457,35 @@ export default function ListaPage() {
             variant="overline"
             sx={{ color: colors.textMuted, fontWeight: 800, letterSpacing: '.12em' }}
           >
-            {view === 'today' ? 'Prioridad del día' : 'Vista completa'}
+            {isPersonalView ? 'Mi lista personal' : 'Lista del equipo'}
           </Typography>
           <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.45rem', md: '1.65rem' } }}>
-            {view === 'today' ? 'Hoy' : 'Todos los pendientes'}
+            {view === 'today'
+              ? isPersonalView
+                ? 'Mis pendientes'
+                : 'Pendientes del equipo'
+              : isPersonalView
+                ? 'Todas mis tareas'
+                : 'Todas las tareas del equipo'}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+            {isPersonalView
+              ? 'Solo se muestran las tareas asignadas a ti. El tablero muestra el flujo del equipo.'
+              : 'Vista de todas las tareas del equipo. Puedes buscar o filtrar por estado y prioridad.'}
           </Typography>
           {view === 'today' ? (
             <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.75 }}>
               <Chip
                 size="small"
-                icon={<WarningAmberRoundedIcon />}
-                label={`${overdueTasks.length} vencidos`}
-                sx={{ bgcolor: colors.errorSoft, color: colors.error, fontWeight: 700 }}
-              />
-              <Chip
-                size="small"
                 icon={<TodayRoundedIcon />}
                 label={`${dueTodayTasks.length} para hoy`}
                 sx={{ bgcolor: theme.palette.warning.light, color: theme.palette.warning.main, fontWeight: 700 }}
+              />
+              <Chip
+                size="small"
+                icon={<WarningAmberRoundedIcon />}
+                label={`${overdueTasks.length} vencidos`}
+                sx={{ bgcolor: colors.errorSoft, color: colors.error, fontWeight: 700 }}
               />
               <Chip
                 size="small"
@@ -472,20 +495,39 @@ export default function ListaPage() {
               />
             </Stack>
           ) : (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
-              {allQuery.data
-                ? plural(allQuery.data.total, 'pendiente encontrado', 'pendientes encontrados')
-                : 'Cargando pendientes…'}
-            </Typography>
+            <Chip
+              size="small"
+              icon={<PersonOutlineRoundedIcon />}
+              label={
+                allQuery.data
+                  ? isPersonalView
+                    ? `${plural(allQuery.data.total, 'tarea asignada', 'tareas asignadas')} a ti`
+                    : plural(allQuery.data.total, 'tarea del equipo', 'tareas del equipo')
+                  : 'Cargando tareas…'
+              }
+              sx={{ mt: 1, bgcolor: colors.bgSubtle, fontWeight: 700 }}
+            />
           )}
         </Box>
 
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          {manager ? (
+            <Button
+              variant="outlined"
+              onClick={() => updateParam('assignedToId', isPersonalView ? undefined : String(session?.id))}
+            >
+              {isPersonalView ? 'Ver equipo' : 'Solo mis tareas'}
+            </Button>
+          ) : (
+            <Button component={RouterLink} to="/tablero" variant="outlined">
+              Ver tablero
+            </Button>
+          )}
           <Button
             variant="outlined"
             onClick={() => setView(view === 'today' ? 'all' : 'today')}
           >
-            {view === 'today' ? 'Ver todos' : 'Volver a hoy'}
+            {view === 'today' ? 'Ver todas' : 'Volver a hoy'}
           </Button>
           <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openNew}>
             Nuevo pendiente
@@ -526,15 +568,11 @@ export default function ListaPage() {
                     <MenuItem value={14}>14 días</MenuItem>
                   </Select>
                 </FormControl>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={onlyMine}
-                      onChange={(e) => setOnlyMine(e.target.checked)}
-                    />
-                  }
-                  label={<Typography variant="body2">Solo mis pendientes</Typography>}
+                <Chip
+                  size="small"
+                  icon={isPersonalView ? <PersonOutlineRoundedIcon /> : <GroupsRoundedIcon />}
+                  label={isPersonalView ? 'Solo mis tareas' : 'Todo el equipo'}
+                  sx={{ bgcolor: colors.bgSubtle, fontWeight: 700 }}
                 />
               </Stack>
             </CardContent>
@@ -560,8 +598,16 @@ export default function ListaPage() {
             <Card variant="outlined">
               <EmptyState
                 icon={CheckCircleRoundedIcon}
-                title="No hay pendientes activos para este periodo"
-                description="No tienes tareas vencidas, para hoy o próximas en el rango seleccionado."
+                title={
+                  isPersonalView
+                    ? 'No tienes pendientes activos para este periodo'
+                    : 'No hay pendientes activos para este periodo'
+                }
+                description={
+                  isPersonalView
+                    ? 'No tienes tareas vencidas, para hoy o próximas en el rango seleccionado.'
+                    : 'No hay tareas vencidas, para hoy o próximas en el rango seleccionado.'
+                }
                 action={
                   <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openNew}>
                     Nuevo pendiente
@@ -572,24 +618,26 @@ export default function ListaPage() {
           ) : (
             <Stack spacing={3}>
               <TaskGroup
-                title="Vencidos"
-                subtitle="Requieren atención inmediata"
-                tone={colors.error}
-                icon={<WarningAmberRoundedIcon fontSize="small" />}
-                tasks={overdueTasks}
-                onOpen={openQuickView}
-                onEdit={openEdit}
-                onToast={setToast}
-              />
-              <TaskGroup
                 title="Para hoy"
-                subtitle={formatDueDate(today)}
+                subtitle="Tus tareas del día"
                 tone={colors.warning}
                 icon={<TodayRoundedIcon fontSize="small" />}
                 tasks={dueTodayTasks}
                 onOpen={openQuickView}
                 onEdit={openEdit}
                 onToast={setToast}
+                showAssignee={!isPersonalView}
+              />
+              <TaskGroup
+                title="Vencidos"
+                subtitle="Solo tus vencidos"
+                tone={colors.error}
+                icon={<WarningAmberRoundedIcon fontSize="small" />}
+                tasks={overdueTasks}
+                onOpen={openQuickView}
+                onEdit={openEdit}
+                onToast={setToast}
+                showAssignee={!isPersonalView}
               />
               <TaskGroup
                 title={`Próximos ${daysAhead} días`}
@@ -600,6 +648,7 @@ export default function ListaPage() {
                 onOpen={openQuickView}
                 onEdit={openEdit}
                 onToast={setToast}
+                showAssignee={!isPersonalView}
               />
             </Stack>
           )}
@@ -613,7 +662,13 @@ export default function ListaPage() {
               onClick={() => setCompletedOpen((value) => !value)}
               sx={{ color: colors.textSecondary, fontWeight: 800 }}
             >
-              {completedOpen ? 'Ocultar completados de esta semana' : 'Ver completados de esta semana'}
+              {completedOpen
+                ? isPersonalView
+                  ? 'Ocultar mis completados de esta semana'
+                  : 'Ocultar completados de esta semana'
+                : isPersonalView
+                  ? 'Ver mis completados de esta semana'
+                  : 'Ver completados de esta semana'}
             </Button>
             <Collapse in={completedOpen} timeout="auto" unmountOnExit>
               <Box sx={{ mt: 2 }}>
@@ -625,8 +680,16 @@ export default function ListaPage() {
                   <Card variant="outlined">
                     <EmptyState
                       icon={CheckCircleRoundedIcon}
-                      title="Todavía no hay completados esta semana"
-                      description="Las tareas completadas aparecerán aquí cuando las necesites consultar."
+                      title={
+                        isPersonalView
+                          ? 'Todavía no tienes completados esta semana'
+                          : 'Todavía no hay completados esta semana'
+                      }
+                      description={
+                        isPersonalView
+                          ? 'Tus tareas completadas aparecerán aquí cuando las necesites consultar.'
+                          : 'Las tareas completadas aparecerán aquí cuando las necesites consultar.'
+                      }
                       compact
                     />
                   </Card>
@@ -637,6 +700,7 @@ export default function ListaPage() {
                       onOpen={openQuickView}
                       onEdit={openEdit}
                       onToast={setToast}
+                      showAssignee={!isPersonalView}
                     />
                     <TaskCards tasks={completedThisWeek} onOpen={openQuickView} />
                   </>
@@ -721,40 +785,6 @@ export default function ListaPage() {
                   </Select>
                 </FormControl>
                 <FormControl size="small">
-                  <InputLabel id="filter-area">Área</InputLabel>
-                  <Select
-                    labelId="filter-area"
-                    label="Área"
-                    value={area}
-                    onChange={(e) => updateParam('area', e.target.value || undefined)}
-                  >
-                    <MenuItem value="">Todas</MenuItem>
-                    {(areasQuery.data ?? []).map((item) => (
-                      <MenuItem key={item.code} value={item.code}>
-                        {item.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                {manager && (
-                  <FormControl size="small">
-                    <InputLabel id="filter-assignee">Responsable</InputLabel>
-                    <Select
-                      labelId="filter-assignee"
-                      label="Responsable"
-                      value={assignedToId}
-                      onChange={(e) => updateParam('assignedToId', e.target.value || undefined)}
-                    >
-                      <MenuItem value="">Todos</MenuItem>
-                      {(usersQuery.data ?? []).map((user) => (
-                        <MenuItem key={user.id} value={String(user.id)}>
-                          {user.fullName}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                )}
-                <FormControl size="small">
                   <InputLabel id="filter-sort">Ordenar por</InputLabel>
                   <Select
                     labelId="filter-sort"
@@ -814,8 +844,8 @@ export default function ListaPage() {
             <Card variant="outlined">
               <EmptyState
                 icon={SearchOffRoundedIcon}
-                title="No hay pendientes con esos filtros"
-                description="Prueba con otros criterios o crea un pendiente nuevo."
+                title={isPersonalView ? 'No tienes tareas con esos filtros' : 'No hay tareas con esos filtros'}
+                description="Prueba con otros criterios o crea una tarea nueva."
                 action={
                   <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openNew}>
                     Nuevo pendiente
@@ -830,6 +860,7 @@ export default function ListaPage() {
                 onOpen={openQuickView}
                 onEdit={openEdit}
                 onToast={setToast}
+                showAssignee={!isPersonalView}
               />
               <TaskCards tasks={allQuery.data.items} onOpen={openQuickView} />
 
