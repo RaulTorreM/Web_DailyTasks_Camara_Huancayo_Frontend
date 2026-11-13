@@ -417,11 +417,11 @@ export default function InicioPage() {
             hint="Activas"
           />
           <StatCard
-            label="Pendientes"
+            label="Proximos"
             value={stats.pending}
             icon={PendingActionsRoundedIcon}
             to={scopedList({ view: 'all', status: 'Pending' })}
-            hint="Sin iniciar"
+            hint="Pendientes"
           />
           <StatCard
             label="Total"
