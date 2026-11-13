@@ -284,88 +284,103 @@ export default function InicioPage() {
           }
         />
 
-        {stats.overdueTasks.length === 0 && stats.todayTasks.length === 0 ? (
-          <Card variant="outlined">
-            <EmptyState
-              icon={CheckCircleRoundedIcon}
-              title={effectiveScope === 'team' ? 'El equipo no tiene pendientes para hoy' : 'No tienes pendientes para hoy'}
-              description="No hay tareas vencidas ni con vencimiento en la fecha actual."
-              compact
-            />
-          </Card>
-        ) : (
-          <Stack spacing={2.5}>
-            {stats.overdueTasks.length > 0 && (
-              <Box>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
-                  <WarningAmberRoundedIcon sx={{ fontSize: 19, color: colors.error }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: '.96rem' }}>Vencidas</Typography>
-                  <Chip
-                    size="small"
-                    label={stats.overdueTasks.length}
-                    sx={{ height: 21, fontWeight: 800, bgcolor: colors.errorSoft, color: colors.error }}
-                  />
-                  {stats.overdueTasks.length > 4 && (
-                    <Button
-                      component={RouterLink}
-                      to={scopedList({ view: 'all', overdue: 'true' })}
-                      size="small"
-                      sx={{ ml: 'auto' }}
-                    >
-                      Ver todas
-                    </Button>
-                  )}
-                </Stack>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
-                    gap: 1.5,
-                  }}
+        <Stack spacing={2.5}>
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
+              <WarningAmberRoundedIcon sx={{ fontSize: 19, color: colors.error }} />
+              <Typography sx={{ fontWeight: 800, fontSize: '.96rem' }}>Vencidas</Typography>
+              <Chip
+                size="small"
+                label={stats.overdueTasks.length}
+                sx={{ height: 21, fontWeight: 800, bgcolor: colors.errorSoft, color: colors.error }}
+              />
+              {stats.overdueTasks.length > 4 && (
+                <Button
+                  component={RouterLink}
+                  to={scopedList({ view: 'all', overdue: 'true' })}
+                  size="small"
+                  sx={{ ml: 'auto' }}
                 >
-                  {overduePreview.map((task) => (
-                    <TaskCard key={task.id} task={task} onClick={() => openQuickView(task)} />
-                  ))}
-                </Box>
+                  Ver todas
+                </Button>
+              )}
+            </Stack>
+            {overduePreview.length === 0 ? (
+              <Card variant="outlined">
+                <EmptyState
+                  icon={CheckCircleRoundedIcon}
+                  title={effectiveScope === 'team' ? 'No hay pendientes vencidos' : 'No tienes pendientes vencidos'}
+                  description={
+                    effectiveScope === 'team'
+                      ? 'Las tareas vencidas del equipo aparecerán aquí.'
+                      : 'Las tareas vencidas aparecerán aquí.'
+                  }
+                  compact
+                />
+              </Card>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                  gap: 1.5,
+                }}
+              >
+                {overduePreview.map((task) => (
+                  <TaskCard key={task.id} task={task} onClick={() => openQuickView(task)} />
+                ))}
               </Box>
             )}
+          </Box>
 
-            {stats.todayTasks.length > 0 && (
-              <Box>
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
-                  <TodayRoundedIcon sx={{ fontSize: 19, color: brand.gold }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: '.96rem' }}>Para hoy</Typography>
-                  <Chip
-                    size="small"
-                    label={stats.todayTasks.length}
-                    sx={{ height: 21, fontWeight: 800, bgcolor: colors.warningSoft, color: colors.warning }}
-                  />
-                  {stats.todayTasks.length > 4 && (
-                    <Button
-                      component={RouterLink}
-                      to={scopedList({ view: 'all', dueDate: today })}
-                      size="small"
-                      sx={{ ml: 'auto' }}
-                    >
-                      Ver todas
-                    </Button>
-                  )}
-                </Stack>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
-                    gap: 1.5,
-                  }}
+          <Box>
+            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
+              <TodayRoundedIcon sx={{ fontSize: 19, color: brand.gold }} />
+              <Typography sx={{ fontWeight: 800, fontSize: '.96rem' }}>Para hoy</Typography>
+              <Chip
+                size="small"
+                label={stats.todayTasks.length}
+                sx={{ height: 21, fontWeight: 800, bgcolor: colors.warningSoft, color: colors.warning }}
+              />
+              {stats.todayTasks.length > 4 && (
+                <Button
+                  component={RouterLink}
+                  to={scopedList({ view: 'all', dueDate: today })}
+                  size="small"
+                  sx={{ ml: 'auto' }}
                 >
-                  {todayPreview.map((task) => (
-                    <TaskCard key={task.id} task={task} onClick={() => openQuickView(task)} />
-                  ))}
-                </Box>
+                  Ver todas
+                </Button>
+              )}
+            </Stack>
+            {todayPreview.length === 0 ? (
+              <Card variant="outlined">
+                <EmptyState
+                  icon={CheckCircleRoundedIcon}
+                  title={effectiveScope === 'team' ? 'No hay pendientes para hoy' : 'No tienes pendientes para hoy'}
+                  description={
+                    effectiveScope === 'team'
+                      ? 'Las tareas de hoy del equipo aparecerán aquí.'
+                      : 'Tus tareas de hoy aparecerán aquí.'
+                  }
+                  compact
+                />
+              </Card>
+            ) : (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+                  gap: 1.5,
+                }}
+              >
+                {todayPreview.map((task) => (
+                  <TaskCard key={task.id} task={task} onClick={() => openQuickView(task)} />
+                ))}
               </Box>
             )}
-          </Stack>
-        )}
+          </Box>
+        </Stack>
       </Box>
 
       <Box sx={{ mt: 4 }}>
