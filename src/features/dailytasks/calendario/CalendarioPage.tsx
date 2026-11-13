@@ -1,3 +1,4 @@
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
 import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import EventBusyRoundedIcon from '@mui/icons-material/EventBusyRounded';
@@ -23,8 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { getCalendar } from '../../../api';
 import type { DailyTask, DailyTaskCard, DailyTaskStatus } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
-import { useAuth } from '../../../auth/AuthContext';
-import { isManager } from '../../../auth/permissions';
+import { useDueDateLimit } from '../../../hooks/useDueDateLimit';
 import EmptyState from '../../../components/common/EmptyState';
 import PageLoader from '../../../components/common/PageLoader';
 import ProgressRing from '../../../components/common/ProgressRing';
@@ -70,11 +70,13 @@ function DayPanel({
   tasks,
   onOpenTask,
   onGoBoard,
+  onCreate,
 }: {
   date: string;
   tasks: DailyTaskCard[];
   onOpenTask: (taskId: number) => void;
   onGoBoard: () => void;
+  onCreate: () => void;
 }) {
   const counts = countByStatus(tasks);
   const total = tasks.length;
@@ -128,14 +130,14 @@ function DayPanel({
           </ProgressRing>
         </Stack>
 
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={onGoBoard}
-          sx={{ mt: 2, mb: 2.5 }}
-        >
-          Ver este día en el tablero
-        </Button>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 2, mb: 2.5 }}>
+          <Button fullWidth variant="contained" startIcon={<AddRoundedIcon />} onClick={onCreate}>
+            Nuevo pendiente
+          </Button>
+          <Button fullWidth variant="outlined" onClick={onGoBoard}>
+            Ver en tablero
+          </Button>
+        </Stack>
 
         {tasks.length === 0 ? (
           <EmptyState
@@ -177,16 +179,16 @@ function DayPanel({
 
 export default function CalendarioPage() {
   const theme = useTheme();
-  const { session } = useAuth();
-  const manager = isManager(session);
+  const { manager, today: allowedFrom, maxDate } = useDueDateLimit();
   const primary = theme.palette.primary.main;
   const nav = useNavigate();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedDate, setSelectedDate] = useState(dateKey(now));
+  const [selectedDate, setSelectedDate] = useState(allowedFrom);
   const [quickTaskId, setQuickTaskId] = useState<number | null>(null);
   const [editing, setEditing] = useState<DailyTask | null>(null);
+  const [creatingDate, setCreatingDate] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [teamView, setTeamView] = useState(false);
 
@@ -214,7 +216,7 @@ export default function CalendarioPage() {
     return d;
   });
 
-  const todayKey = dateKey(now);
+  const todayKey = allowedFrom;
   const selectedTasks = tasksByDate.get(selectedDate) ?? [];
 
   const moveMonth = (delta: number) => {
@@ -228,7 +230,7 @@ export default function CalendarioPage() {
     const today = new Date();
     setYear(today.getFullYear());
     setMonth(today.getMonth());
-    setSelectedDate(dateKey(today));
+    setSelectedDate(allowedFrom);
   };
 
   if (calendarQuery.isLoading && !calendarQuery.data) return <PageLoader />;
@@ -295,7 +297,14 @@ export default function CalendarioPage() {
 
       {teamView && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setTeamView(false)}>
-          Estás viendo los vencimientos de todo el equipo.
+          Estás viendo los vencimientos de todo el equipo. Este modo solo lo activa Gerencia General.
+        </Alert>
+      )}
+
+      {!manager && maxDate && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Solo puedes seleccionar fechas entre {formatDateOnlyLong(allowedFrom)} y{' '}
+          {formatDateOnlyLong(maxDate)}.
         </Alert>
       )}
 
@@ -356,36 +365,44 @@ export default function CalendarioPage() {
                     const inMonth = d.getMonth() === month;
                     const isToday = key === todayKey;
                     const selected = key === selectedDate;
+                    const blocked =
+                      !manager && (key < allowedFrom || (maxDate != null && key > maxDate));
 
                     return (
                       <Box
                         key={key}
                         component="button"
                         type="button"
-                        onClick={() => setSelectedDate(key)}
+                        disabled={blocked}
+                        aria-disabled={blocked || undefined}
+                        onClick={() => {
+                          if (!blocked) setSelectedDate(key);
+                        }}
                         aria-label={`Ver pendientes del ${formatDateOnlyLong(key)}`}
                         sx={{
                           all: 'unset',
                           boxSizing: 'border-box',
                           minHeight: { xs: 92, md: 116 },
                           p: 1,
-                          cursor: 'pointer',
+                          cursor: blocked ? 'not-allowed' : 'pointer',
                           bgcolor: selected
                             ? alpha(brand.gold, 0.07)
                             : inMonth
                               ? colors.surface
                               : colors.bgSubtle,
-                          opacity: inMonth ? 1 : 0.55,
+                          opacity: blocked ? 0.32 : inMonth ? 1 : 0.55,
                           borderRight: `1px solid ${colors.border}`,
                           borderBottom: `1px solid ${colors.border}`,
                           outline: selected ? `2px solid ${brand.gold}` : 'none',
                           outlineOffset: -2,
                           transition: 'background-color .16s ease',
-                          '&:hover': { bgcolor: inMonth ? alpha(primary, 0.06) : colors.bg },
-                          '&:focus-visible': {
-                            outline: `2px solid ${alpha(primary, 0.65)}`,
-                            outlineOffset: -2,
-                          },
+                          '&:hover': { bgcolor: blocked || !inMonth ? undefined : alpha(primary, 0.06) },
+                          '&:focus-visible': blocked
+                            ? undefined
+                            : {
+                                outline: `2px solid ${alpha(primary, 0.65)}`,
+                                outlineOffset: -2,
+                              },
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -468,6 +485,11 @@ export default function CalendarioPage() {
           tasks={selectedTasks}
           onOpenTask={(taskId) => setQuickTaskId(taskId)}
           onGoBoard={() => nav(`/tablero?dueDate=${selectedDate}`)}
+          onCreate={() => {
+            setEditing(null);
+            setCreatingDate(selectedDate);
+            setFormOpen(true);
+          }}
         />
       </Box>
 
@@ -485,12 +507,15 @@ export default function CalendarioPage() {
       <TaskFormDialog
         open={formOpen}
         task={editing}
+        initialDueDate={creatingDate ?? undefined}
         onClose={() => {
           setFormOpen(false);
           setEditing(null);
+          setCreatingDate(null);
         }}
         onSaved={() => {
           setEditing(null);
+          setCreatingDate(null);
           void calendarQuery.refetch();
         }}
       />

@@ -63,6 +63,15 @@ export interface DailyTaskSettings {
   updatedAt: string;
 }
 
+export interface DailyTaskNotification {
+  id: number;
+  taskId: number;
+  taskTitle: string;
+  message: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
 export interface DailyTaskHistoryEntry {
   id: number;
   changedAt: string;

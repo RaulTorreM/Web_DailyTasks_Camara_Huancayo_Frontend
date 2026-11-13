@@ -9,6 +9,7 @@ import type {
   DailyTaskCalendarQuery,
   DailyTaskChanges,
   DailyTaskHistoryEntry,
+  DailyTaskNotification,
   DailyTaskQuery,
   DailyTaskSettings,
   PagedResult,
@@ -71,6 +72,15 @@ export const getTaskSettings = () => http.get<DailyTaskSettings>('/tasks/setting
 
 export const updateTaskSettings = (userDueDateWindowDays: number) =>
   http.put<DailyTaskSettings>('/tasks/settings', { userDueDateWindowDays });
+
+export const getNotifications = () =>
+  http.get<DailyTaskNotification[]>('/tasks/notifications');
+
+export const markNotificationRead = (id: number) =>
+  http.post<void>(`/tasks/notifications/${id}/read`);
+
+export const markAllNotificationsRead = () =>
+  http.post<void>('/tasks/notifications/read-all');
 
 export const getChanges = (since?: string) =>
   http.get<DailyTaskChanges>(`/tasks/changes${qs({ since })}`);

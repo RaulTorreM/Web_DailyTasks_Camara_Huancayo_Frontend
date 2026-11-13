@@ -39,6 +39,7 @@ import type { DailyTask, DailyTaskBoard, DailyTaskCard, DailyTaskStatus } from '
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
 import { canEditTask, isManager } from '../../../auth/permissions';
+import { useDueDateLimit } from '../../../hooks/useDueDateLimit';
 import PageLoader from '../../../components/common/PageLoader';
 import ConfirmDialog from '../../../components/dailytasks/ConfirmDialog';
 import TaskCard from '../../../components/dailytasks/TaskCard';
@@ -244,6 +245,9 @@ export default function TableroPage() {
 
   const today = todayLima();
   const nextWeekTo = format(addDays(parseISO(today), 7), 'yyyy-MM-dd');
+  const { maxDate: dueDateLimitMax } = useDueDateLimit();
+  const upcomingTo =
+    dueDateLimitMax && dueDateLimitMax < nextWeekTo ? dueDateLimitMax : nextWeekTo;
   const allDates = params.get('scope') === 'all';
   const dueDateParam = params.get('dueDate') ?? '';
   const dateFromParam = params.get('dueFrom') ?? dueDateParam;
@@ -253,7 +257,8 @@ export default function TableroPage() {
   const dueFrom = dateFromParam || defaultDate;
   const dueTo = dateToParam || defaultDate;
   const onlyToday = !allDates && dueFrom === today && dueTo === today;
-  const includeUpcoming = !allDates && dueFrom === today && dueTo === nextWeekTo;
+  const includeUpcoming =
+    upcomingTo !== today && !allDates && dueFrom === today && dueTo === upcomingTo;
   const hasDateFilter = Boolean(dueFrom || dueTo);
   const [teamView, setTeamView] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
@@ -289,7 +294,9 @@ export default function TableroPage() {
   );
 
   const rangeLabel = includeUpcoming
-    ? 'Próximos 7 días'
+    ? upcomingTo === nextWeekTo
+      ? 'Próximos 7 días'
+      : 'Próximos días'
     : onlyToday
     ? 'Hoy'
     : dueFrom && dueTo
@@ -369,14 +376,23 @@ export default function TableroPage() {
     setParams(nextParams, { replace: true });
   };
 
+  const clampDate = (value: string) => {
+    if (!value || manager || !dueDateLimitMax) return value;
+    if (value < today) return today;
+    if (value > dueDateLimitMax) return dueDateLimitMax;
+    return value;
+  };
+
   const changeFrom = (value: string) => {
-    const nextTo = value && dueTo && value > dueTo ? value : dueTo;
-    setRange(value, nextTo);
+    const from = clampDate(value);
+    const nextTo = from && dueTo && from > dueTo ? from : dueTo;
+    setRange(from, nextTo);
   };
 
   const changeTo = (value: string) => {
-    const nextFrom = value && dueFrom && value < dueFrom ? value : dueFrom;
-    setRange(nextFrom, value);
+    const to = clampDate(value);
+    const nextFrom = to && dueFrom && to < dueFrom ? dueFrom : dueFrom;
+    setRange(nextFrom, to);
   };
 
   const clearDateFilters = () => {
@@ -384,7 +400,7 @@ export default function TableroPage() {
   };
 
   const toggleUpcoming = (checked: boolean) => {
-    if (checked) setRange(today, nextWeekTo);
+    if (checked && upcomingTo !== today) setRange(today, upcomingTo);
     else setRange(today, today);
   };
 
@@ -560,6 +576,7 @@ export default function TableroPage() {
               value={dueFrom}
               onChange={(event) => changeFrom(event.target.value)}
               InputLabelProps={{ shrink: true }}
+              inputProps={{ min: manager ? undefined : today, max: manager ? undefined : dueDateLimitMax }}
               sx={{ width: { xs: '100%', sm: 160 } }}
             />
             <TextField
@@ -569,12 +586,14 @@ export default function TableroPage() {
               value={dueTo}
               onChange={(event) => changeTo(event.target.value)}
               InputLabelProps={{ shrink: true }}
+              inputProps={{ min: manager ? undefined : today, max: manager ? undefined : dueDateLimitMax }}
               sx={{ width: { xs: '100%', sm: 160 } }}
             />
             <FormControlLabel
               control={
                 <Switch
                   checked={includeUpcoming}
+                  disabled={upcomingTo === today}
                   onChange={(event) => toggleUpcoming(event.target.checked)}
                 />
               }

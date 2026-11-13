@@ -14,33 +14,34 @@ import {
   TextField,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, format, parseISO } from 'date-fns';
 import { useEffect, useState, type FormEvent } from 'react';
-import { createTask, getTaskSettings, listUsers, updateTask } from '../../../api';
+import { createTask, listUsers, updateTask } from '../../../api';
 import type { DailyTask, DailyTaskPriority } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
-import { isManager } from '../../../auth/permissions';
+import { useDueDateLimit } from '../../../hooks/useDueDateLimit';
 import { priorityLabel, priorityOrder } from '../../../utils/labels';
-import { formatDueDate, todayLima } from '../../../utils/format';
+import { formatDueDate } from '../../../utils/format';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** Si se envía, el diálogo edita; si no, crea. */
   task?: DailyTask | null;
+  /** Fecha inicial al crear, por ejemplo el día seleccionado en el calendario. */
+  initialDueDate?: string;
   onSaved?: () => void;
 }
 
-export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) {
+export default function TaskFormDialog({ open, onClose, task, initialDueDate, onSaved }: Props) {
   const { session } = useAuth();
-  const manager = isManager(session);
+  const { manager, today, maxDate } = useDueDateLimit();
   const queryClient = useQueryClient();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<DailyTaskPriority>('Medium');
-  const [dueDate, setDueDate] = useState(todayLima());
+  const [dueDate, setDueDate] = useState(initialDueDate ?? today);
   const [assignedToId, setAssignedToId] = useState<number>(session?.id ?? 0);
   const [error, setError] = useState('');
 
@@ -50,18 +51,6 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
     enabled: open && manager,
     staleTime: 5 * 60_000,
   });
-
-  const settingsQuery = useQuery({
-    queryKey: qk.settings,
-    queryFn: getTaskSettings,
-    enabled: open && !manager,
-    staleTime: 0,
-  });
-
-  const today = todayLima();
-  const maxDueDate = settingsQuery.data
-    ? format(addDays(parseISO(today), settingsQuery.data.userDueDateWindowDays), 'yyyy-MM-dd')
-    : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -76,10 +65,10 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
       setTitle('');
       setDescription('');
       setPriority('Medium');
-      setDueDate(todayLima());
+      setDueDate(initialDueDate ?? today);
       setAssignedToId(session?.id ?? 0);
     }
-  }, [open, task, session?.id]);
+  }, [open, task, initialDueDate, today, session?.id]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -132,11 +121,11 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
     }
     if (
       !manager &&
-      maxDueDate &&
+      maxDate &&
       (!task || task.dueDate !== dueDate) &&
-      (dueDate < today || dueDate > maxDueDate)
+      (dueDate < today || dueDate > maxDate)
     ) {
-      setError(`Tu vencimiento debe estar entre ${formatDueDate(today)} y ${formatDueDate(maxDueDate)}.`);
+      setError(`Tu vencimiento debe estar entre ${formatDueDate(today)} y ${formatDueDate(maxDate)}.`);
       return;
     }
     if (manager && !assignedToId) {
@@ -210,11 +199,11 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
               InputLabelProps={{ shrink: true }}
               inputProps={{
                 min: manager ? undefined : today,
-                max: manager ? undefined : maxDueDate,
+                max: manager ? undefined : maxDate,
               }}
               helperText={
-                !manager && maxDueDate
-                  ? `Permitido: ${formatDueDate(today)} al ${formatDueDate(maxDueDate)}.`
+                !manager && maxDate
+                  ? `Permitido: ${formatDueDate(today)} al ${formatDueDate(maxDate)}.`
                   : undefined
               }
               disabled={mutation.isPending}

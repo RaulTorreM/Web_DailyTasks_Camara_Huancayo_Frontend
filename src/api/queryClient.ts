@@ -36,6 +36,7 @@ export const qk = {
   users: (area?: string) => ['users', area ?? ''] as const,
   areas: ['areas'] as const,
   settings: ['task-settings'] as const,
+  notifications: ['notifications'] as const,
 };
 
 /** Invalida todas las vistas que pueden haberse visto afectadas por un cambio de tarea. */
@@ -46,6 +47,7 @@ export function invalidateTaskViews(client: QueryClient, taskId?: number) {
   void client.invalidateQueries({ queryKey: qk.summary });
   void client.invalidateQueries({ queryKey: ['report'] });
   void client.invalidateQueries({ queryKey: ['audit'] });
+  void client.invalidateQueries({ queryKey: ['notifications'] });
   if (taskId != null) {
     void client.invalidateQueries({ queryKey: qk.task(taskId) });
     void client.invalidateQueries({ queryKey: qk.history(taskId) });

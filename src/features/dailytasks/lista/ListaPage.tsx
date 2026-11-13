@@ -192,11 +192,24 @@ interface TaskGroupProps {
   onEdit: (task: DailyTask) => void;
   onToast: (message: string) => void;
   showAssignee?: boolean;
+  emptyTitle: string;
+  emptyDescription: string;
 }
 
-function TaskGroup({ title, subtitle, tone, icon, tasks, onOpen, onEdit, onToast, showAssignee = false }: TaskGroupProps) {
+function TaskGroup({
+  title,
+  subtitle,
+  tone,
+  icon,
+  tasks,
+  onOpen,
+  onEdit,
+  onToast,
+  showAssignee = false,
+  emptyTitle,
+  emptyDescription,
+}: TaskGroupProps) {
   const theme = useTheme();
-  if (tasks.length === 0) return null;
 
   return (
     <Box>
@@ -238,8 +251,16 @@ function TaskGroup({ title, subtitle, tone, icon, tasks, onOpen, onEdit, onToast
           {subtitle}
         </Typography>
       </Stack>
-      <TaskTable tasks={tasks} onOpen={onOpen} onEdit={onEdit} onToast={onToast} showAssignee={showAssignee} />
-      <TaskCards tasks={tasks} onOpen={onOpen} />
+      {tasks.length === 0 ? (
+        <Card variant="outlined">
+          <EmptyState icon={CheckCircleRoundedIcon} title={emptyTitle} description={emptyDescription} compact />
+        </Card>
+      ) : (
+        <>
+          <TaskTable tasks={tasks} onOpen={onOpen} onEdit={onEdit} onToast={onToast} showAssignee={showAssignee} />
+          <TaskCards tasks={tasks} onOpen={onOpen} />
+        </>
+      )}
     </Box>
   );
 }
@@ -594,32 +615,11 @@ export default function ListaPage() {
 
           {todayLoading ? (
             <PageLoader />
-          ) : activeTasks.length === 0 ? (
-            <Card variant="outlined">
-              <EmptyState
-                icon={CheckCircleRoundedIcon}
-                title={
-                  isPersonalView
-                    ? 'No tienes pendientes activos para este periodo'
-                    : 'No hay pendientes activos para este periodo'
-                }
-                description={
-                  isPersonalView
-                    ? 'No tienes tareas vencidas, para hoy o próximas en el rango seleccionado.'
-                    : 'No hay tareas vencidas, para hoy o próximas en el rango seleccionado.'
-                }
-                action={
-                  <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openNew}>
-                    Nuevo pendiente
-                  </Button>
-                }
-              />
-            </Card>
           ) : (
             <Stack spacing={3}>
               <TaskGroup
                 title="Para hoy"
-                subtitle="Tus tareas del día"
+                subtitle={isPersonalView ? 'Tus tareas del día' : 'Tareas del equipo del día'}
                 tone={colors.warning}
                 icon={<TodayRoundedIcon fontSize="small" />}
                 tasks={dueTodayTasks}
@@ -627,6 +627,12 @@ export default function ListaPage() {
                 onEdit={openEdit}
                 onToast={setToast}
                 showAssignee={!isPersonalView}
+                emptyTitle={isPersonalView ? 'No tienes pendientes para hoy' : 'No hay pendientes para hoy'}
+                emptyDescription={
+                  isPersonalView
+                    ? 'Tus tareas de hoy aparecerán aquí.'
+                    : 'Las tareas de hoy del equipo aparecerán aquí.'
+                }
               />
               <TaskGroup
                 title={`Próximos ${daysAhead} días`}
@@ -638,6 +644,12 @@ export default function ListaPage() {
                 onEdit={openEdit}
                 onToast={setToast}
                 showAssignee={!isPersonalView}
+                emptyTitle={isPersonalView ? 'No tienes pendientes próximos' : 'No hay pendientes próximos'}
+                emptyDescription={
+                  isPersonalView
+                    ? 'Tus próximos vencimientos aparecerán aquí.'
+                    : 'Los próximos vencimientos del equipo aparecerán aquí.'
+                }
               />
               <TaskGroup
                 title="Vencidos"
@@ -649,6 +661,12 @@ export default function ListaPage() {
                 onEdit={openEdit}
                 onToast={setToast}
                 showAssignee={!isPersonalView}
+                emptyTitle={isPersonalView ? 'No tienes pendientes vencidos' : 'No hay pendientes vencidos'}
+                emptyDescription={
+                  isPersonalView
+                    ? 'Las tareas vencidas aparecerán aquí.'
+                    : 'Las tareas vencidas del equipo aparecerán aquí.'
+                }
               />
             </Stack>
           )}
