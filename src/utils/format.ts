@@ -40,6 +40,10 @@ export const formatDateOnlyLong = (s: string) => {
 /** Fecha de hoy en Perú, formato aaaa-mm-dd (para inputs de tipo date). */
 export const todayLima = () => formatInTimeZone(new Date(), LIMA_TIMEZONE, 'yyyy-MM-dd');
 
+/** Fecha de mañana en Perú, formato aaaa-mm-dd. */
+export const tomorrowLima = () =>
+  formatInTimeZone(new Date(Date.now() + 24 * 60 * 60 * 1000), LIMA_TIMEZONE, 'yyyy-MM-dd');
+
 /** Fecha local de Perú en formato aaaa-mm-dd. */
 export const toInputDate = (d: Date) => formatInTimeZone(d, LIMA_TIMEZONE, 'yyyy-MM-dd');
 

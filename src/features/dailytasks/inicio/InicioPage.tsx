@@ -46,7 +46,7 @@ export default function InicioPage() {
   const theme = useTheme();
   const { session } = useAuth();
   const manager = isManager(session);
-  const [scope, setScope] = useState<Scope>(manager ? 'team' : 'me');
+  const [scope, setScope] = useState<Scope>('me');
   const [quickTaskId, setQuickTaskId] = useState<number | null>(null);
 
   const effectiveScope: Scope = manager ? scope : 'me';
@@ -57,6 +57,7 @@ export default function InicioPage() {
     queryFn: () =>
       listAllTasks({
         assignedToId: effectiveScope === 'me' ? session?.id : undefined,
+        teamView: effectiveScope === 'team' || undefined,
         pageSize: 100,
         sortBy: 'dueDate',
         sortDir: 'asc',
@@ -70,21 +71,21 @@ export default function InicioPage() {
     const activeTasks = tasks.filter((task) => task.status !== 'Done');
     const todayTasks = tasks.filter((task) => task.dueDate === today);
     const overdueTasks = activeTasks.filter((task) => task.dueDate < today);
-    const completedToday = tasks.filter((task) => task.completedOn === today);
+    const completedDueToday = todayTasks.filter((task) => task.status === 'Done').length;
     const dueTodayActive = todayTasks.filter((task) => task.status !== 'Done');
-    const todayWork = completedToday.length + dueTodayActive.length + overdueTasks.length;
+    const todayTotal = todayTasks.length;
 
     return {
       activeTasks,
       todayTasks,
       overdueTasks,
-      completedToday,
+      completedDueToday,
       dueTodayActive,
       pending: activeTasks.filter((task) => task.status === 'Pending').length,
       inProgress: activeTasks.filter((task) => task.status === 'InProgress').length,
       total: tasks.length,
-      todayWork,
-      todayCompletion: todayWork > 0 ? Math.min(100, (completedToday.length / todayWork) * 100) : 0,
+      todayTotal,
+      todayCompletion: todayTotal > 0 ? Math.min(100, (completedDueToday / todayTotal) * 100) : 0,
     };
   }, [tasks, today]);
 
@@ -126,9 +127,8 @@ export default function InicioPage() {
 
   const scopedList = (extra: Record<string, string> = {}) => {
     // El equipo se revisa en el tablero; la lista es personal.
-    if (effectiveScope === 'team') return '/tablero';
+    if (effectiveScope === 'team') return '/tablero?team=1';
     const params = new URLSearchParams(extra);
-    if (session?.id) params.set('assignedToId', String(session.id));
     const query = params.toString();
     return `/lista${query ? `?${query}` : ''}`;
   };
@@ -263,11 +263,11 @@ export default function InicioPage() {
                 {formatPercent(stats.todayCompletion)}
               </Typography>
               <Typography sx={{ color: alpha('#FFFFFF', 0.62), fontSize: '.66rem', fontWeight: 700 }}>
-                avance del equipo
+                {effectiveScope === 'team' ? 'avance del equipo' : 'avance del día'}
               </Typography>
             </ProgressRing>
             <Typography sx={{ color: alpha('#FFFFFF', 0.6), fontSize: '.7rem', fontWeight: 600 }}>
-              {stats.completedToday.length} completadas · {stats.dueTodayActive.length + stats.overdueTasks.length} pendientes
+              {stats.completedDueToday} de {stats.todayTotal} de hoy · {stats.overdueTasks.length} vencidas
             </Typography>
           </Stack>
         </CardContent>
@@ -403,11 +403,11 @@ export default function InicioPage() {
           />
           <StatCard
             label="Completadas hoy"
-            value={stats.completedToday.length}
+            value={stats.completedDueToday}
             icon={CheckCircleRoundedIcon}
             tone="success"
             to="/informes"
-            hint="Cerradas hoy"
+            hint="Con vencimiento hoy"
           />
           <StatCard
             label="En progreso"

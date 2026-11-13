@@ -30,13 +30,14 @@ import {
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { CSS } from '@dnd-kit/utilities';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { addDays, format, parseISO } from 'date-fns';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { changeTaskStatus, getBoard } from '../../../api';
 import type { DailyTask, DailyTaskBoard, DailyTaskCard, DailyTaskStatus } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
-import { canEditTask } from '../../../auth/permissions';
+import { canEditTask, isManager } from '../../../auth/permissions';
 import PageLoader from '../../../components/common/PageLoader';
 import ConfirmDialog from '../../../components/dailytasks/ConfirmDialog';
 import TaskCard from '../../../components/dailytasks/TaskCard';
@@ -235,10 +236,12 @@ function BoardColumn({
 
 export default function TableroPage() {
   const { session } = useAuth();
+  const manager = isManager(session);
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
 
   const today = todayLima();
+  const nextWeekTo = format(addDays(parseISO(today), 7), 'yyyy-MM-dd');
   const allDates = params.get('scope') === 'all';
   const dueDateParam = params.get('dueDate') ?? '';
   const dateFromParam = params.get('dueFrom') ?? dueDateParam;
@@ -247,8 +250,9 @@ export default function TableroPage() {
   const defaultDate = !allDates && !hasExplicitDate ? today : '';
   const dueFrom = dateFromParam || defaultDate;
   const dueTo = dateToParam || defaultDate;
-  const includeOverdue = params.get('includeOverdue') === 'true';
+  const teamView = manager && params.get('team') === '1';
   const onlyToday = !allDates && dueFrom === today && dueTo === today;
+  const includeUpcoming = !allDates && dueFrom === today && dueTo === nextWeekTo;
   const hasDateFilter = Boolean(dueFrom || dueTo);
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [overStatus, setOverStatus] = useState<DailyTaskStatus | null>(null);
@@ -273,7 +277,9 @@ export default function TableroPage() {
     }),
   );
 
-  const rangeLabel = onlyToday
+  const rangeLabel = includeUpcoming
+    ? 'Próximos 7 días'
+    : onlyToday
     ? 'Hoy'
     : dueFrom && dueTo
       ? dueFrom === dueTo
@@ -289,9 +295,9 @@ export default function TableroPage() {
     () => ({
       dueFrom: dueFrom || undefined,
       dueTo: dueTo || undefined,
-      overdue: !includeOverdue && (dueFrom || dueTo) ? false : undefined,
+      teamView: teamView || undefined,
     }),
-    [dueFrom, dueTo, includeOverdue],
+    [dueFrom, dueTo, teamView],
   );
 
   const boardQuery = useQuery({
@@ -363,19 +369,18 @@ export default function TableroPage() {
   };
 
   const clearDateFilters = () => {
-    const nextParams = new URLSearchParams(params);
-    nextParams.delete('dueDate');
-    nextParams.delete('dueFrom');
-    nextParams.delete('dueTo');
-    nextParams.delete('includeOverdue');
-    nextParams.set('scope', 'all');
-    setParams(nextParams, { replace: true });
+    setRange(today, today);
   };
 
-  const toggleOverdue = (checked: boolean) => {
+  const toggleUpcoming = (checked: boolean) => {
+    if (checked) setRange(today, nextWeekTo);
+    else setRange(today, today);
+  };
+
+  const toggleTeam = (checked: boolean) => {
     const nextParams = new URLSearchParams(params);
-    if (checked) nextParams.set('includeOverdue', 'true');
-    else nextParams.delete('includeOverdue');
+    if (checked) nextParams.set('team', '1');
+    else nextParams.delete('team');
     setParams(nextParams, { replace: true });
   };
 
@@ -482,9 +487,11 @@ export default function TableroPage() {
             variant="overline"
             sx={{ color: colors.textMuted, fontWeight: 800, letterSpacing: '.12em' }}
           >
-            Flujo diario
+            {teamView ? 'Flujo del equipo' : 'Mi flujo diario'}
           </Typography>
-          <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.45rem', md: '1.65rem' } }}>Tablero</Typography>
+          <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.45rem', md: '1.65rem' } }}>
+            {teamView ? 'Tablero del equipo' : 'Mi tablero'}
+          </Typography>
           <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.75 }}>
             <Chip size="small" label={plural(total, 'tarea', 'tareas')} sx={{ bgcolor: colors.bgSubtle, fontWeight: 700 }} />
             <Chip
@@ -494,8 +501,8 @@ export default function TableroPage() {
               label={rangeLabel}
               onDelete={hasDateFilter ? clearDateFilters : undefined}
             />
-            {hasDateFilter && includeOverdue && (
-              <Chip size="small" color="warning" variant="outlined" label="Incluye vencidas del rango" />
+            {teamView && (
+              <Chip size="small" color="secondary" variant="outlined" label="Equipo completo" />
             )}
           </Stack>
         </Box>
@@ -548,28 +555,38 @@ export default function TableroPage() {
             <FormControlLabel
               control={
                 <Switch
-                  checked={includeOverdue}
-                  disabled={!hasDateFilter}
-                  onChange={(event) => toggleOverdue(event.target.checked)}
+                  checked={includeUpcoming}
+                  onChange={(event) => toggleUpcoming(event.target.checked)}
                 />
               }
-              label="Incluir vencidas"
+              label="Incluir próximos"
             />
+            {manager && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={teamView}
+                    onChange={(event) => toggleTeam(event.target.checked)}
+                  />
+                }
+                label="Ver equipo"
+              />
+            )}
             <Box sx={{ flex: 1 }} />
-            <Button size="small" variant="text" onClick={clearDateFilters} disabled={!hasDateFilter}>
-              Ver todos
+            <Button size="small" variant="text" onClick={clearDateFilters} disabled={onlyToday}>
+              Restablecer
             </Button>
           </Stack>
         </CardContent>
       </Card>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {hasDateFilter
-          ? `${onlyToday ? 'Solo tareas de hoy' : rangeLabel}${includeOverdue ? ' · incluye vencidas del rango' : ' · sin vencidas'}.`
-          : 'Todas las fechas.'}{' '}
+        {hasDateFilter ? `${onlyToday ? 'Solo tareas de hoy' : rangeLabel}.` : 'Todas las fechas.'}{' '}
+        {teamView ? 'Vista del equipo.' : 'Vista personal.'}{' '}
         {hasDateFilter
           ? 'Los completados se muestran por fecha de cierre dentro del rango.'
-          : 'Se muestran todos los completados.'}
+          : 'Se muestran todos los completados.'}{' '}
+        Para ver una tarea vencida, selecciona su fecha de vencimiento.
       </Typography>
 
       <DndContext

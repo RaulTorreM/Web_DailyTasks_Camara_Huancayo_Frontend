@@ -87,7 +87,7 @@ export default function MobileNav({ onOpenMore }: Props) {
         <Box sx={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
           <Box
             component={RouterLink}
-            to="/lista?nuevo=1"
+            to="/tablero?nuevo=1"
             aria-label="Nuevo pendiente"
             sx={{
               position: 'absolute',

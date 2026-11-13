@@ -50,7 +50,7 @@ export default function AppSidebar() {
       <Box sx={{ px: 2.5, pt: 2.25 }}>
         <Button
           component={RouterLink}
-          to="/lista?nuevo=1"
+          to="/tablero?nuevo=1"
           fullWidth
           variant="contained"
           startIcon={<AddRoundedIcon />}

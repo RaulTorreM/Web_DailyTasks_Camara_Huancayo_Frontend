@@ -8,11 +8,6 @@ import {
   MenuItem,
   Select,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
   useTheme,
@@ -33,8 +28,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { getMyReport, getReport, listAreas, listUsers } from '../../../api';
-import type { DailyTaskPriority, DailyTaskStatus, ReportGranularity } from '../../../api/types';
+import { getMyReport, getReport, listUsers } from '../../../api';
+import type { DailyTaskPriority, ReportGranularity } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
 import { isManager } from '../../../auth/permissions';
@@ -42,7 +37,7 @@ import PageLoader from '../../../components/common/PageLoader';
 import SectionHeading from '../../../components/common/SectionHeading';
 import { colors, taskPriority, taskStatus } from '../../../theme/tokens';
 import { formatPercent, toInputDate } from '../../../utils/format';
-import { priorityLabel, priorityOrder, statusLabel, statusOrder } from '../../../utils/labels';
+import { priorityLabel, priorityOrder, statusLabel } from '../../../utils/labels';
 
 function shortDate(value: string) {
   const [, month, day] = value.split('-');
@@ -86,10 +81,8 @@ export default function RangeReport() {
   const [from, setFrom] = useState(toInputDate(subDays(today, 29)));
   const [to, setTo] = useState(toInputDate(today));
   const [granularity, setGranularity] = useState<ReportGranularity>('day');
-  const [area, setArea] = useState('');
-  const [status, setStatus] = useState<DailyTaskStatus | ''>('');
   const [priority, setPriority] = useState<DailyTaskPriority | ''>('');
-  const [userId, setUserId] = useState('');
+  const [userId, setUserId] = useState(String(session?.id ?? ''));
 
   const invalidRange = Boolean(from && to && from > to);
 
@@ -98,24 +91,16 @@ export default function RangeReport() {
       from,
       to,
       granularity,
-      area: area || undefined,
-      status: (status || undefined) as DailyTaskStatus | undefined,
       priority: (priority || undefined) as DailyTaskPriority | undefined,
-      userId: manager && userId ? Number(userId) : undefined,
+      userId: manager ? (userId ? Number(userId) : session?.id) : undefined,
     }),
-    [from, to, granularity, area, status, priority, manager, userId],
+    [from, to, granularity, priority, manager, userId, session?.id],
   );
 
   const reportQuery = useQuery({
     queryKey: manager ? qk.reportGlobal(query) : qk.reportMe(query),
     queryFn: () => (manager ? getReport(query) : getMyReport(query)),
     enabled: Boolean(from && to) && !invalidRange,
-  });
-
-  const areasQuery = useQuery({
-    queryKey: qk.areas,
-    queryFn: () => listAreas(),
-    staleTime: 10 * 60_000,
   });
 
   const usersQuery = useQuery({
@@ -156,6 +141,14 @@ export default function RangeReport() {
       })),
     [report, theme.palette.mode],
   );
+
+  const axisColor = theme.palette.text.secondary;
+  const tooltipStyle = {
+    backgroundColor: theme.palette.background.paper,
+    border: `1px solid ${theme.palette.divider}`,
+    borderRadius: 8,
+    color: theme.palette.text.primary,
+  };
 
   return (
     <Box>
@@ -198,38 +191,6 @@ export default function RangeReport() {
               </Select>
             </FormControl>
             <FormControl size="small">
-              <InputLabel id="report-area">Área</InputLabel>
-              <Select
-                labelId="report-area"
-                label="Área"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-              >
-                <MenuItem value="">Todas</MenuItem>
-                {(areasQuery.data ?? []).map((item) => (
-                  <MenuItem key={item.code} value={item.code}>
-                    {item.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small">
-              <InputLabel id="report-status">Estado</InputLabel>
-              <Select
-                labelId="report-status"
-                label="Estado"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as DailyTaskStatus | '')}
-              >
-                <MenuItem value="">Todos</MenuItem>
-                {statusOrder.map((value) => (
-                  <MenuItem key={value} value={value}>
-                    {statusLabel[value]}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small">
               <InputLabel id="report-priority">Prioridad</InputLabel>
               <Select
                 labelId="report-priority"
@@ -254,7 +215,6 @@ export default function RangeReport() {
                   value={userId}
                   onChange={(e) => setUserId(e.target.value)}
                 >
-                  <MenuItem value="">Todos</MenuItem>
                   {(usersQuery.data ?? []).map((user) => (
                     <MenuItem key={user.id} value={String(user.id)}>
                       {user.fullName}
@@ -341,10 +301,14 @@ export default function RangeReport() {
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={seriesData} margin={{ top: 8, right: 12, bottom: 0, left: -12 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                      <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-                      <RechartsTooltip />
-                      <Legend />
+                      <XAxis dataKey="period" tick={{ fontSize: 11, fill: axisColor }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: axisColor }} />
+                      <RechartsTooltip
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: theme.palette.text.secondary }}
+                        itemStyle={{ color: theme.palette.text.primary }}
+                      />
+                      <Legend wrapperStyle={{ color: theme.palette.text.secondary }} />
                       <Line type="monotone" dataKey="creados" name="Creados" stroke={colors.info} strokeWidth={2.5} dot={false} />
                       <Line type="monotone" dataKey="completados" name="Completados" stroke={colors.success} strokeWidth={2.5} dot={false} />
                     </LineChart>
@@ -360,9 +324,13 @@ export default function RangeReport() {
                   <ResponsiveContainer width="100%" height={170}>
                     <BarChart data={statusData} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
-                      <RechartsTooltip />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: axisColor }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: axisColor }} />
+                      <RechartsTooltip
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: theme.palette.text.secondary }}
+                        itemStyle={{ color: theme.palette.text.primary }}
+                      />
                       <Bar dataKey="value" name="Pendientes" radius={[6, 6, 0, 0]}>
                         {statusData.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
@@ -379,9 +347,13 @@ export default function RangeReport() {
                   <ResponsiveContainer width="100%" height={170}>
                     <BarChart data={priorityData} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke={theme.palette.divider} />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
-                      <RechartsTooltip />
+                      <XAxis dataKey="name" tick={{ fontSize: 10, fill: axisColor }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: axisColor }} />
+                      <RechartsTooltip
+                        contentStyle={tooltipStyle}
+                        labelStyle={{ color: theme.palette.text.secondary }}
+                        itemStyle={{ color: theme.palette.text.primary }}
+                      />
                       <Bar dataKey="value" name="Pendientes" radius={[6, 6, 0, 0]}>
                         {priorityData.map((entry) => (
                           <Cell key={entry.name} fill={entry.color} />
@@ -394,67 +366,6 @@ export default function RangeReport() {
             </Stack>
           </Box>
 
-          {manager && report.byUser.length > 0 && (
-            <Box sx={{ mt: 3 }}>
-              <SectionHeading title="Carga por usuario" subtitle="Métricas del equipo en el periodo" />
-              <Card variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Usuario</TableCell>
-                      <TableCell>Área</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                      <TableCell align="right">Completados</TableCell>
-                      <TableCell align="right">Vencidos</TableCell>
-                      <TableCell align="right">Cumplimiento</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {report.byUser.map((row) => (
-                      <TableRow key={row.userId} hover>
-                        <TableCell sx={{ fontWeight: 700 }}>{row.fullName}</TableCell>
-                        <TableCell>{row.areaName}</TableCell>
-                        <TableCell align="right">{row.total}</TableCell>
-                        <TableCell align="right">{row.done}</TableCell>
-                        <TableCell align="right">{row.overdue}</TableCell>
-                        <TableCell align="right">{formatPercent(row.completionRate)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            </Box>
-          )}
-
-          {report.byArea.length > 0 && (
-            <Box sx={{ mt: 3 }}>
-              <SectionHeading title="Resumen por área" subtitle="Cumplimiento y vencimientos" />
-              <Card variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Área</TableCell>
-                      <TableCell align="right">Total</TableCell>
-                      <TableCell align="right">Completados</TableCell>
-                      <TableCell align="right">Vencidos</TableCell>
-                      <TableCell align="right">Cumplimiento</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {report.byArea.map((row) => (
-                      <TableRow key={row.area} hover>
-                        <TableCell sx={{ fontWeight: 700 }}>{row.areaName}</TableCell>
-                        <TableCell align="right">{row.total}</TableCell>
-                        <TableCell align="right">{row.done}</TableCell>
-                        <TableCell align="right">{row.overdue}</TableCell>
-                        <TableCell align="right">{formatPercent(row.completionRate)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            </Box>
-          )}
         </>
       ) : null}
     </Box>

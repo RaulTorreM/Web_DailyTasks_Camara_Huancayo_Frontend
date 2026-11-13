@@ -252,13 +252,9 @@ export default function ListaPage() {
 
   const view = params.get('view') === 'all' ? 'all' : 'today';
   const today = todayLima();
-  const assignedToId = params.get('assignedToId') ?? '';
-  const visibleAssigneeId = manager
-    ? assignedToId
-      ? Number(assignedToId)
-      : undefined
-    : session?.id;
-  const isPersonalView = !manager || (assignedToId !== '' && Number(assignedToId) === session?.id);
+  const teamView = manager && params.get('team') === '1';
+  const visibleAssigneeId = teamView ? undefined : session?.id;
+  const isPersonalView = !teamView;
   const [daysAhead, setDaysAhead] = useState(3);
   const [completedOpen, setCompletedOpen] = useState(false);
 
@@ -327,6 +323,7 @@ export default function ListaPage() {
       status: (status || undefined) as DailyTaskStatus | undefined,
       priority: (priority || undefined) as DailyTaskPriority | undefined,
       assignedToId: visibleAssigneeId,
+      teamView: teamView || undefined,
       dueDate: dueDate || undefined,
       overdue: overdue || undefined,
       page,
@@ -334,7 +331,7 @@ export default function ListaPage() {
       sortBy,
       sortDir: 'asc' as const,
     }),
-    [debouncedSearch, status, priority, visibleAssigneeId, dueDate, overdue, page, sortBy],
+    [debouncedSearch, status, priority, visibleAssigneeId, teamView, dueDate, overdue, page, sortBy],
   );
 
   const todayQuery = useQuery({
@@ -343,12 +340,14 @@ export default function ListaPage() {
       horizon,
       q: debouncedSearch,
       assignee: visibleAssigneeId,
+      teamView,
     }),
     queryFn: () =>
       listAllTasks({
         dueTo: horizon,
         q: debouncedSearch || undefined,
         assignedToId: visibleAssigneeId,
+        teamView: teamView || undefined,
         pageSize: 100,
         sortBy: 'dueDate',
         sortDir: 'asc',
@@ -364,12 +363,13 @@ export default function ListaPage() {
   });
 
   const completedQuery = useQuery({
-    queryKey: qk.tasks({ completedWeek: weekStart, assignee: visibleAssigneeId }),
+    queryKey: qk.tasks({ completedWeek: weekStart, assignee: visibleAssigneeId, teamView }),
     queryFn: () =>
       listAllTasks({
         status: 'Done',
         updatedSince: weekStartUtc,
         assignedToId: visibleAssigneeId,
+        teamView: teamView || undefined,
         pageSize: 100,
         sortBy: 'dueDate',
         sortDir: 'desc',
@@ -435,7 +435,7 @@ export default function ListaPage() {
   };
 
   const hasFilters = Boolean(
-    qFromUrl || status || priority || assignedToId || dueDate || overdue || sortBy !== 'dueDate',
+    qFromUrl || status || priority || teamView || dueDate || overdue || sortBy !== 'dueDate',
   );
 
   const todayLoading = view === 'today' && todayQuery.isLoading && !todayQuery.data;
@@ -470,7 +470,7 @@ export default function ListaPage() {
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
             {isPersonalView
-              ? 'Solo se muestran las tareas asignadas a ti. El tablero muestra el flujo del equipo.'
+              ? 'Solo se muestran las tareas asignadas a ti.'
               : 'Vista de todas las tareas del equipo. Puedes buscar o filtrar por estado y prioridad.'}
           </Typography>
           {view === 'today' ? (
@@ -483,15 +483,15 @@ export default function ListaPage() {
               />
               <Chip
                 size="small"
-                icon={<WarningAmberRoundedIcon />}
-                label={`${overdueTasks.length} vencidos`}
-                sx={{ bgcolor: colors.errorSoft, color: colors.error, fontWeight: 700 }}
-              />
-              <Chip
-                size="small"
                 icon={<ScheduleRoundedIcon />}
                 label={`${upcomingTasks.length} próximos`}
                 sx={{ bgcolor: colors.infoSoft, color: colors.info, fontWeight: 700 }}
+              />
+              <Chip
+                size="small"
+                icon={<WarningAmberRoundedIcon />}
+                label={`${overdueTasks.length} vencidos`}
+                sx={{ bgcolor: colors.errorSoft, color: colors.error, fontWeight: 700 }}
               />
             </Stack>
           ) : (
@@ -514,9 +514,9 @@ export default function ListaPage() {
           {manager ? (
             <Button
               variant="outlined"
-              onClick={() => updateParam('assignedToId', isPersonalView ? undefined : String(session?.id))}
+              onClick={() => updateParam('team', teamView ? undefined : '1')}
             >
-              {isPersonalView ? 'Ver equipo' : 'Solo mis tareas'}
+              {teamView ? 'Ver mi lista' : 'Ver equipo'}
             </Button>
           ) : (
             <Button component={RouterLink} to="/tablero" variant="outlined">
@@ -629,22 +629,22 @@ export default function ListaPage() {
                 showAssignee={!isPersonalView}
               />
               <TaskGroup
-                title="Vencidos"
-                subtitle="Solo tus vencidos"
-                tone={colors.error}
-                icon={<WarningAmberRoundedIcon fontSize="small" />}
-                tasks={overdueTasks}
+                title={`Próximos ${daysAhead} días`}
+                subtitle={`Hasta ${formatDueDate(horizon)}`}
+                tone={colors.info}
+                icon={<ScheduleRoundedIcon fontSize="small" />}
+                tasks={upcomingTasks}
                 onOpen={openQuickView}
                 onEdit={openEdit}
                 onToast={setToast}
                 showAssignee={!isPersonalView}
               />
               <TaskGroup
-                title={`Próximos ${daysAhead} días`}
-                subtitle={`Hasta ${formatDueDate(horizon)}`}
-                tone={colors.info}
-                icon={<ScheduleRoundedIcon fontSize="small" />}
-                tasks={upcomingTasks}
+                title="Vencidos"
+                subtitle={isPersonalView ? 'Solo tus vencidos' : 'Vencidos del equipo'}
+                tone={colors.error}
+                icon={<WarningAmberRoundedIcon fontSize="small" />}
+                tasks={overdueTasks}
                 onOpen={openQuickView}
                 onEdit={openEdit}
                 onToast={setToast}

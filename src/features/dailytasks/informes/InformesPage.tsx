@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardContent,
-  Chip,
   Divider,
   FormControl,
   GlobalStyles,
@@ -28,8 +27,8 @@ import { alpha } from '@mui/material/styles';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
 import { useMemo, useState } from 'react';
-import { listAllTasks, listAreas, listUsers } from '../../../api';
-import type { DailyTask, DailyTaskUser } from '../../../api/types';
+import { listAllTasks, listUsers } from '../../../api';
+import type { DailyTask } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
 import { isManager } from '../../../auth/permissions';
@@ -39,21 +38,6 @@ import { TaskPriorityChip, TaskStatusChip } from '../../../components/common/Sta
 import { colors, taskStatus } from '../../../theme/tokens';
 import { formatDateOnlyLong, formatDateTime, formatDueDate, formatPercent, todayLima } from '../../../utils/format';
 import RangeReport from './RangeReport';
-
-interface AreaRow {
-  area: string;
-  areaName: string;
-  due: number;
-  completedToday: number;
-  pending: number;
-  overdue: number;
-  rate: number;
-}
-
-interface UserRow extends AreaRow {
-  userId: number;
-  fullName: string;
-}
 
 function MetricCard({ label, value, hint, tone = colors.info }: { label: string; value: string | number; hint?: string; tone?: string }) {
   return (
@@ -94,7 +78,7 @@ function ReportTaskTable({
         <Table
           size="small"
           sx={{
-            minWidth: showCompleted ? 940 : 860,
+            minWidth: showCompleted ? 760 : 700,
             '@media print': { minWidth: 0, width: '100%' },
           }}
         >
@@ -102,8 +86,6 @@ function ReportTaskTable({
             <TableRow>
               <TableCell>Código</TableCell>
               <TableCell>Tarea</TableCell>
-              <TableCell>Área</TableCell>
-              <TableCell>Responsable</TableCell>
               <TableCell>Vence</TableCell>
               <TableCell className="print-hide">Prioridad</TableCell>
               <TableCell>Estado</TableCell>
@@ -117,8 +99,6 @@ function ReportTaskTable({
                   {task.code}
                 </TableCell>
                 <TableCell sx={{ fontWeight: 700, fontSize: '.82rem' }}>{task.title}</TableCell>
-                <TableCell sx={{ fontSize: '.78rem' }}>{task.areaName}</TableCell>
-                <TableCell sx={{ fontSize: '.78rem' }}>{task.assignedToName}</TableCell>
                 <TableCell sx={{ whiteSpace: 'nowrap', fontSize: '.78rem', color: task.isOverdue ? colors.error : colors.text }}>
                   {formatDueDate(task.dueDate)}
                 </TableCell>
@@ -138,148 +118,22 @@ function ReportTaskTable({
   );
 }
 
-function AreaTable({ rows }: { rows: AreaRow[] }) {
-  if (rows.length === 0) {
-    return (
-      <Card variant="outlined" sx={{ boxShadow: 'none' }}>
-        <CardContent sx={{ py: 3 }}>
-          <Typography variant="body2" color="text.secondary" align="center">
-            No hay áreas con pendientes para este día.
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card variant="outlined" sx={{ boxShadow: 'none' }}>
-      <TableContainer>
-        <Table size="small" sx={{ minWidth: 720 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Área</TableCell>
-              <TableCell align="right">Vencían</TableCell>
-              <TableCell align="right">Completadas hoy</TableCell>
-              <TableCell align="right">Pendientes</TableCell>
-              <TableCell align="right">Vencidas</TableCell>
-              <TableCell align="right">Cumplimiento</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow
-                key={row.area}
-                sx={{ bgcolor: row.pending > 0 || row.overdue > 0 ? alpha(colors.warning, 0.055) : undefined }}
-              >
-                <TableCell sx={{ fontWeight: 800 }}>{row.areaName}</TableCell>
-                <TableCell align="right">{row.due}</TableCell>
-                <TableCell align="right">{row.completedToday}</TableCell>
-                <TableCell align="right">
-                  <Chip
-                    size="small"
-                    label={row.pending}
-                    sx={{ height: 21, fontWeight: 800, bgcolor: row.pending > 0 ? colors.warningSoft : colors.bgSubtle, color: row.pending > 0 ? colors.warning : colors.textSecondary }}
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <Chip
-                    size="small"
-                    label={row.overdue}
-                    sx={{ height: 21, fontWeight: 800, bgcolor: row.overdue > 0 ? colors.errorSoft : colors.bgSubtle, color: row.overdue > 0 ? colors.error : colors.textSecondary }}
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 800, color: row.rate >= 100 ? colors.success : colors.warning }}
-                  >
-                    {formatPercent(row.rate)}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Card>
-  );
-}
-
-function UserTable({ rows }: { rows: UserRow[] }) {
-  return (
-    <Card variant="outlined" sx={{ boxShadow: 'none' }}>
-      <TableContainer>
-        <Table size="small" sx={{ minWidth: 820 }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Usuario</TableCell>
-              <TableCell>Área</TableCell>
-              <TableCell align="right">Vencían</TableCell>
-              <TableCell align="right">Completadas hoy</TableCell>
-              <TableCell align="right">Pendientes</TableCell>
-              <TableCell align="right">Vencidas</TableCell>
-              <TableCell align="right">Cumplimiento</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => (
-              <TableRow
-                key={row.userId}
-                sx={{ bgcolor: row.pending > 0 || row.overdue > 0 ? alpha(colors.warning, 0.055) : undefined }}
-              >
-                <TableCell sx={{ fontWeight: 800 }}>{row.fullName}</TableCell>
-                <TableCell sx={{ fontSize: '.78rem' }}>{row.areaName}</TableCell>
-                <TableCell align="right">{row.due}</TableCell>
-                <TableCell align="right">{row.completedToday}</TableCell>
-                <TableCell align="right">
-                  <Chip
-                    size="small"
-                    label={row.pending}
-                    sx={{ height: 21, fontWeight: 800, bgcolor: row.pending > 0 ? colors.warningSoft : colors.bgSubtle, color: row.pending > 0 ? colors.warning : colors.textSecondary }}
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <Chip
-                    size="small"
-                    label={row.overdue}
-                    sx={{ height: 21, fontWeight: 800, bgcolor: row.overdue > 0 ? colors.errorSoft : colors.bgSubtle, color: row.overdue > 0 ? colors.error : colors.textSecondary }}
-                  />
-                </TableCell>
-                <TableCell align="right">
-                  <Typography
-                    variant="body2"
-                    sx={{ fontWeight: 800, color: row.rate >= 100 ? colors.success : colors.warning }}
-                  >
-                    {formatPercent(row.rate)}
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Card>
-  );
-}
-
 export default function InformesPage() {
   const theme = useTheme();
   const { session } = useAuth();
   const manager = isManager(session);
   const [tab, setTab] = useState(0);
   const [date, setDate] = useState(todayLima());
-  const [area, setArea] = useState('');
-  const [userId, setUserId] = useState('');
+  const [userId, setUserId] = useState(String(session?.id ?? ''));
 
-  const assignedToId = manager ? (userId ? Number(userId) : undefined) : session?.id;
+  const assignedToId = manager ? (userId ? Number(userId) : session?.id) : session?.id;
   const startOfDayUtc = fromZonedTime(`${date}T00:00:00`, 'America/Lima').toISOString();
 
   const dueUpToQuery = useQuery({
-    queryKey: qk.tasks({ report: 'daily', kind: 'dueUpTo', date, area, assignedToId }),
+    queryKey: qk.tasks({ report: 'daily', kind: 'dueUpTo', date, assignedToId }),
     queryFn: () =>
       listAllTasks({
         dueTo: date,
-        area: area || undefined,
         assignedToId,
         pageSize: 100,
         sortBy: 'dueDate',
@@ -289,12 +143,11 @@ export default function InformesPage() {
   });
 
   const completedQuery = useQuery({
-    queryKey: qk.tasks({ report: 'daily', kind: 'completed', date, area, assignedToId }),
+    queryKey: qk.tasks({ report: 'daily', kind: 'completed', date, assignedToId }),
     queryFn: () =>
       listAllTasks({
         status: 'Done',
         updatedSince: startOfDayUtc,
-        area: area || undefined,
         assignedToId,
         pageSize: 100,
         sortBy: 'dueDate',
@@ -310,12 +163,6 @@ export default function InformesPage() {
     staleTime: 5 * 60_000,
   });
 
-  const areasQuery = useQuery({
-    queryKey: qk.areas,
-    queryFn: () => listAreas(),
-    staleTime: 10 * 60_000,
-  });
-
   const allDueUpTo = dueUpToQuery.data ?? [];
   const dueTasks = allDueUpTo.filter((task) => task.dueDate === date);
   const overdueTasks = allDueUpTo.filter((task) => task.status !== 'Done' && task.dueDate < date);
@@ -327,69 +174,6 @@ export default function InformesPage() {
   const pendingDue = dueTasks.filter((task) => task.status !== 'Done');
   const attention = dueTasks.length + overdueTasks.length;
   const completionRate = attention > 0 ? Math.min(100, (completedTasks.length / attention) * 100) : 0;
-
-  const userRows = useMemo<UserRow[]>(() => {
-    const source: Array<Pick<DailyTaskUser, 'id' | 'fullName' | 'area' | 'areaName'>> = manager
-      ? (usersQuery.data ?? [])
-      : session
-        ? [{ id: session.id, fullName: session.name, area: session.area, areaName: session.areaName }]
-        : [];
-
-    const filtered = manager && userId ? source.filter((user) => user.id === Number(userId)) : source;
-
-    return filtered
-      .map((user) => {
-        const mine = dueTasks.filter((task) => task.assignedToId === user.id);
-        const minePending = mine.filter((task) => task.status !== 'Done');
-        const mineCompleted = completedTasks.filter((task) => task.assignedToId === user.id);
-        const mineOverdue = overdueTasks.filter((task) => task.assignedToId === user.id);
-        return {
-          userId: user.id,
-          fullName: user.fullName,
-          area: user.area,
-          areaName: user.areaName,
-          due: mine.length,
-          completedToday: mineCompleted.length,
-          pending: minePending.length,
-          overdue: mineOverdue.length,
-          rate: mine.length + mineOverdue.length > 0
-            ? Math.min(100, (mineCompleted.length / (mine.length + mineOverdue.length)) * 100)
-            : 0,
-        };
-      })
-      .sort((a, b) => b.pending - a.pending || b.overdue - a.overdue || a.rate - b.rate);
-  }, [manager, usersQuery.data, userId, session, dueTasks, completedTasks, overdueTasks]);
-
-  const areaRows = useMemo<AreaRow[]>(() => {
-    const source = manager
-      ? (areasQuery.data ?? [])
-      : session
-        ? [{ code: session.area, name: session.areaName }]
-        : [];
-
-    const filtered = manager && area ? source.filter((item) => item.code === area) : source;
-
-    return filtered
-      .map((item) => {
-        const mine = dueTasks.filter((task) => task.area === item.code);
-        const minePending = mine.filter((task) => task.status !== 'Done');
-        const mineCompleted = completedTasks.filter((task) => task.area === item.code);
-        const mineOverdue = overdueTasks.filter((task) => task.area === item.code);
-        return {
-          area: item.code,
-          areaName: item.name,
-          due: mine.length,
-          completedToday: mineCompleted.length,
-          pending: minePending.length,
-          overdue: mineOverdue.length,
-          rate: mine.length + mineOverdue.length > 0
-            ? Math.min(100, (mineCompleted.length / (mine.length + mineOverdue.length)) * 100)
-            : 0,
-        };
-      })
-      .filter((row) => row.due > 0 || row.completedToday > 0 || row.overdue > 0)
-      .sort((a, b) => b.pending - a.pending || b.overdue - a.overdue || a.rate - b.rate);
-  }, [manager, areasQuery.data, area, session, dueTasks, completedTasks, overdueTasks]);
 
   const isLoading = dueUpToQuery.isLoading || completedQuery.isLoading;
   const hasError = dueUpToQuery.isError || completedQuery.isError;
@@ -472,22 +256,10 @@ export default function InformesPage() {
                 <Button variant="outlined" onClick={() => setDate(todayLima())}>
                   Hoy
                 </Button>
-                <FormControl size="small" sx={{ minWidth: 190 }}>
-                  <InputLabel id="daily-area">Área</InputLabel>
-                  <Select labelId="daily-area" label="Área" value={area} onChange={(e) => setArea(e.target.value)}>
-                    <MenuItem value="">Todas</MenuItem>
-                    {(areasQuery.data ?? []).map((item) => (
-                      <MenuItem key={item.code} value={item.code}>
-                        {item.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
                 {manager && (
                   <FormControl size="small" sx={{ minWidth: 200 }}>
                     <InputLabel id="daily-user">Usuario</InputLabel>
                     <Select labelId="daily-user" label="Usuario" value={userId} onChange={(e) => setUserId(e.target.value)}>
-                      <MenuItem value="">Todos</MenuItem>
                       {(usersQuery.data ?? []).map((user) => (
                         <MenuItem key={user.id} value={String(user.id)}>
                           {user.fullName}
@@ -572,17 +344,6 @@ export default function InformesPage() {
                 <ReportTaskTable tasks={overdueTasks} emptyText="No hay tareas vencidas." />
               </Box>
 
-              <Box sx={{ mt: 3 }}>
-                <SectionHeading title="Cierre por área" subtitle="Áreas con tareas del día" />
-                <AreaTable rows={areaRows} />
-              </Box>
-
-              {manager && (
-                <Box sx={{ mt: 3 }}>
-                  <SectionHeading title="Cierre por usuario" subtitle="Responsables con tareas del día" />
-                  <UserTable rows={userRows} />
-                </Box>
-              )}
             </>
           )}
         </Box>
