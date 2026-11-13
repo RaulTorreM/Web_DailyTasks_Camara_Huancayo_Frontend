@@ -4,7 +4,6 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useDailyTasksHub } from '../../hooks/useDailyTasksHub';
 import { layout } from '../../theme/tokens';
 import PageLoader from '../common/PageLoader';
-import DueSoonAlarm from '../dailytasks/DueSoonAlarm';
 import AppSidebar from './AppSidebar';
 import AppTopBar from './AppTopBar';
 import MobileMenu from './MobileMenu';
@@ -66,7 +65,6 @@ export default function AppLayout() {
         </Box>
       </Box>
 
-      <DueSoonAlarm />
       <MobileNav onOpenMore={() => setMenuOpen(true)} />
       <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </Box>

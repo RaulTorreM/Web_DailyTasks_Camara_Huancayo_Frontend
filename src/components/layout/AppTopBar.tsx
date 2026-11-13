@@ -22,6 +22,7 @@ import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import ChangePasswordDialog from '../../features/auth/ChangePasswordDialog';
+import DueSoonNotification from '../dailytasks/DueSoonNotification';
 import { useColorMode } from '../../theme/ColorModeContext';
 import { layout } from '../../theme/tokens';
 import { initials, roleLabel } from '../../utils/user';
@@ -137,6 +138,8 @@ export default function AppTopBar({ onOpenMenu }: Props) {
             <SearchRoundedIcon />
           </IconButton>
         </Tooltip>
+
+        <DueSoonNotification />
 
         <Tooltip title={mode === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
           <IconButton
