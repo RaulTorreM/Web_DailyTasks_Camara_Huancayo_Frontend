@@ -121,7 +121,6 @@ export default function InicioPage() {
   }
 
   const firstName = (session?.name ?? '').trim().split(/\s+/)[0] || 'usuario';
-  const overduePreview = stats.overdueTasks.slice(0, 4);
   const todayPreview = stats.todayTasks.slice(0, 4);
   const maxAreaActive = Math.max(1, ...areaLoad.map((row) => row.active));
 
@@ -285,54 +284,6 @@ export default function InicioPage() {
         />
 
         <Stack spacing={2.5}>
-          <Box>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
-              <WarningAmberRoundedIcon sx={{ fontSize: 19, color: colors.error }} />
-              <Typography sx={{ fontWeight: 800, fontSize: '.96rem' }}>Vencidas</Typography>
-              <Chip
-                size="small"
-                label={stats.overdueTasks.length}
-                sx={{ height: 21, fontWeight: 800, bgcolor: colors.errorSoft, color: colors.error }}
-              />
-              {stats.overdueTasks.length > 4 && (
-                <Button
-                  component={RouterLink}
-                  to={scopedList({ view: 'all', overdue: 'true' })}
-                  size="small"
-                  sx={{ ml: 'auto' }}
-                >
-                  Ver todas
-                </Button>
-              )}
-            </Stack>
-            {overduePreview.length === 0 ? (
-              <Card variant="outlined">
-                <EmptyState
-                  icon={CheckCircleRoundedIcon}
-                  title={effectiveScope === 'team' ? 'No hay pendientes vencidos' : 'No tienes pendientes vencidos'}
-                  description={
-                    effectiveScope === 'team'
-                      ? 'Las tareas vencidas del equipo aparecerán aquí.'
-                      : 'Las tareas vencidas aparecerán aquí.'
-                  }
-                  compact
-                />
-              </Card>
-            ) : (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
-                  gap: 1.5,
-                }}
-              >
-                {overduePreview.map((task) => (
-                  <TaskCard key={task.id} task={task} onClick={() => openQuickView(task)} />
-                ))}
-              </Box>
-            )}
-          </Box>
-
           <Box>
             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.25 }}>
               <TodayRoundedIcon sx={{ fontSize: 19, color: brand.gold }} />
