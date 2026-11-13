@@ -17,32 +17,34 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   getNotifications,
-  listTasks,
+  listAllTasks,
   markAllNotificationsRead,
   markNotificationRead,
 } from '../../api';
+import type { DailyTask } from '../../api/types';
 import { qk } from '../../api/queryClient';
 import { useAuth } from '../../auth/AuthContext';
-import { formatDateTime, formatDueDate, tomorrowLima } from '../../utils/format';
+import { formatDateTime, formatDueDate, todayLima, tomorrowLima } from '../../utils/format';
 import { priorityLabel } from '../../utils/labels';
 
 /**
  * Campana persistente del header.
- * Incluye vencimientos de mañana y notificaciones de asignación.
+ * Incluye los pendientes que están por vencer (hoy, mañana y los creados en días
+ * anteriores que todavía no vencen) y las notificaciones de asignación.
  */
 export default function DueSoonNotification() {
   const { session } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const today = todayLima();
   const tomorrow = tomorrowLima();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
   const dueSoonQuery = useQuery({
-    queryKey: qk.tasks({ alarm: 'dueTomorrow', userId: session?.id, date: tomorrow }),
+    queryKey: qk.tasks({ alarm: 'dueSoon', userId: session?.id, today, tomorrow }),
     queryFn: () =>
-      listTasks({
+      listAllTasks({
         assignedToId: session?.id,
-        dueDate: tomorrow,
         pageSize: 100,
         sortBy: 'dueDate',
         sortDir: 'asc',
@@ -69,20 +71,53 @@ export default function DueSoonNotification() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: qk.notifications }),
   });
 
-  const dueTomorrow = useMemo(
-    () => (dueSoonQuery.data?.items ?? []).filter((task) => task.status !== 'Done' && task.dueDate === tomorrow),
-    [dueSoonQuery.data, tomorrow],
+  // Se mantienen los vencimientos de hoy y mañana para cualquier pendiente, y
+  // también los creados en días anteriores mientras aún no venzan.
+  const dueSoon = useMemo(
+    () =>
+      (dueSoonQuery.data ?? [])
+        .filter(
+          (task) =>
+            task.status !== 'Done' &&
+            !task.isDeleted &&
+            task.dueDate >= today &&
+            (task.dueDate <= tomorrow || task.createdOn < today),
+        )
+        .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.code.localeCompare(b.code)),
+    [dueSoonQuery.data, today, tomorrow],
   );
+
+  const dueToday = dueSoon.filter((task) => task.dueDate === today);
+  const dueTomorrow = dueSoon.filter((task) => task.dueDate === tomorrow);
+  const dueLater = dueSoon.filter((task) => task.dueDate > tomorrow);
 
   const notifications = notificationsQuery.data ?? [];
   const unread = notifications.filter((item) => item.readAt == null);
-  const totalCount = dueTomorrow.length + unread.length;
+  const totalCount = dueSoon.length + unread.length;
   const hasAlerts = totalCount > 0;
 
   const openTaskList = () => {
     setAnchor(null);
     navigate('/lista');
   };
+
+  const renderTask = (task: DailyTask, showDueDate = false) => (
+    <MenuItem
+      key={`due-${task.id}`}
+      onClick={openTaskList}
+      sx={{ alignItems: 'flex-start', py: 1 }}
+    >
+      <Stack spacing={0.2} sx={{ minWidth: 0 }}>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: '.84rem' }}>
+          {task.title}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {task.code} · {priorityLabel[task.priority]}
+          {showDueDate ? ` · vence ${formatDueDate(task.dueDate)}` : ''}
+        </Typography>
+      </Stack>
+    </MenuItem>
+  );
 
   return (
     <>
@@ -122,31 +157,44 @@ export default function DueSoonNotification() {
         </Box>
         <Divider />
 
+        {dueToday.length > 0 && (
+          <>
+            <Box sx={{ px: 2, pt: 1.25, pb: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: 'error.main' }}>
+                VENCEN HOY · {formatDueDate(today)}
+              </Typography>
+            </Box>
+            {dueToday.slice(0, 5).map((task) => renderTask(task))}
+          </>
+        )}
+
         {dueTomorrow.length > 0 && (
           <>
+            {dueToday.length > 0 && <Divider sx={{ my: 0.5 }} />}
             <Box sx={{ px: 2, pt: 1.25, pb: 0.5 }}>
               <Typography variant="caption" sx={{ fontWeight: 800, color: 'warning.main' }}>
                 VENCEN MAÑANA · {formatDueDate(tomorrow)}
               </Typography>
             </Box>
-            {dueTomorrow.slice(0, 5).map((task) => (
-              <MenuItem key={`due-${task.id}`} onClick={openTaskList} sx={{ alignItems: 'flex-start', py: 1 }}>
-                <Stack spacing={0.2} sx={{ minWidth: 0 }}>
-                  <Typography noWrap sx={{ fontWeight: 800, fontSize: '.84rem' }}>
-                    {task.title}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {task.code} · {priorityLabel[task.priority]}
-                  </Typography>
-                </Stack>
-              </MenuItem>
-            ))}
+            {dueTomorrow.slice(0, 5).map((task) => renderTask(task))}
+          </>
+        )}
+
+        {dueLater.length > 0 && (
+          <>
+            {(dueToday.length > 0 || dueTomorrow.length > 0) && <Divider sx={{ my: 0.5 }} />}
+            <Box sx={{ px: 2, pt: 1.25, pb: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 800, color: 'warning.main' }}>
+                PRÓXIMOS VENCIMIENTOS
+              </Typography>
+            </Box>
+            {dueLater.slice(0, 5).map((task) => renderTask(task, true))}
           </>
         )}
 
         {notifications.length > 0 && (
           <>
-            {dueTomorrow.length > 0 && <Divider sx={{ my: 0.5 }} />}
+            {dueSoon.length > 0 && <Divider sx={{ my: 0.5 }} />}
             <Box sx={{ px: 2, pt: 1.25, pb: 0.5 }}>
               <Typography variant="caption" sx={{ fontWeight: 800, color: 'primary.main' }}>
                 ASIGNACIONES

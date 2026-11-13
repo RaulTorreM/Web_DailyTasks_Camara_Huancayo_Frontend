@@ -125,9 +125,9 @@ export default function InicioPage() {
   const maxAreaActive = Math.max(1, ...areaLoad.map((row) => row.active));
 
   const scopedList = (extra: Record<string, string> = {}) => {
-    // El equipo se revisa en el tablero; la lista es personal.
-    if (effectiveScope === 'team') return '/tablero';
+    // La lista permite alternar entre vista personal y del equipo (solo Gerencia).
     const params = new URLSearchParams(extra);
+    if (effectiveScope === 'team') params.set('team', '1');
     const query = params.toString();
     return `/lista${query ? `?${query}` : ''}`;
   };
@@ -278,7 +278,7 @@ export default function InicioPage() {
           subtitle={`${stats.overdueTasks.length} vencidas · ${stats.todayTasks.length} para hoy`}
           action={
             <Button component={RouterLink} to={scopedList()} size="small">
-              {effectiveScope === 'team' ? 'Abrir tablero' : 'Abrir mi lista'}
+              {effectiveScope === 'team' ? 'Abrir lista del equipo' : 'Abrir mi lista'}
             </Button>
           }
         />
