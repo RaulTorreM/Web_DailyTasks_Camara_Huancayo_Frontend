@@ -266,6 +266,8 @@ export interface DailyTaskQuery {
 export interface DailyTaskCalendarQuery extends DailyTaskQuery {
   from?: string;
   to?: string;
+  /** Agrupa el calendario por vencimiento (predeterminado) o por fecha de creación. */
+  groupBy?: 'dueDate' | 'createdOn';
 }
 
 export interface DailyTaskReportQuery {

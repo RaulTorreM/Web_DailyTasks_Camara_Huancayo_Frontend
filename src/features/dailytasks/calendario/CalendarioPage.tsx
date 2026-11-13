@@ -14,6 +14,8 @@ import {
   IconButton,
   Stack,
   Switch,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   useTheme,
 } from '@mui/material';
@@ -38,6 +40,8 @@ import TaskFormDialog from '../lista/TaskFormDialog';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const STATUS_ORDER: DailyTaskStatus[] = ['Pending', 'InProgress', 'Done'];
+
+type CalendarGroupBy = 'dueDate' | 'createdOn';
 
 const dateKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -69,12 +73,14 @@ function StatusCount({ status, count }: { status: DailyTaskStatus; count: number
 function DayPanel({
   date,
   tasks,
+  groupBy,
   onOpenTask,
   onGoBoard,
   onCreate,
 }: {
   date: string;
   tasks: DailyTaskCard[];
+  groupBy: CalendarGroupBy;
   onOpenTask: (taskId: number) => void;
   onGoBoard: () => void;
   onCreate: () => void;
@@ -99,7 +105,7 @@ function DayPanel({
               variant="overline"
               sx={{ color: colors.textMuted, fontWeight: 800, letterSpacing: '.1em' }}
             >
-              Detalle del día
+              {groupBy === 'createdOn' ? 'Pendientes creados' : 'Pendientes que vencen'}
             </Typography>
             <Typography component="h2" sx={{ fontSize: '1.05rem', fontWeight: 800, mt: 0.2 }}>
               {formatDateOnlyLong(date)}
@@ -144,7 +150,11 @@ function DayPanel({
           <EmptyState
             icon={EventBusyRoundedIcon}
             title="Sin pendientes este día"
-            description="No hay vencimientos registrados para la fecha seleccionada."
+            description={
+              groupBy === 'createdOn'
+                ? 'No hay pendientes creados para la fecha seleccionada.'
+                : 'No hay vencimientos registrados para la fecha seleccionada.'
+            }
             compact
           />
         ) : (
@@ -193,12 +203,13 @@ export default function CalendarioPage() {
   const [creatingDate, setCreatingDate] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [teamView, setTeamView] = useState(false);
+  const [groupBy, setGroupBy] = useState<CalendarGroupBy>('dueDate');
 
   const { from, to } = monthBounds(year, month);
 
   const calendarQuery = useQuery({
-    queryKey: qk.calendar(from, to, { teamView }),
-    queryFn: () => getCalendar({ from, to, teamView: teamView || undefined }),
+    queryKey: qk.calendar(from, to, { teamView, groupBy }),
+    queryFn: () => getCalendar({ from, to, teamView: teamView || undefined, groupBy }),
   });
 
   const tasksByDate = useMemo(() => {
@@ -274,6 +285,22 @@ export default function CalendarioPage() {
         </Box>
 
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={groupBy}
+            onChange={(_, value: CalendarGroupBy | null) => {
+              if (value) setGroupBy(value);
+            }}
+            aria-label="Agrupar pendientes en el calendario"
+          >
+            <ToggleButton value="dueDate" sx={{ textTransform: 'none', fontWeight: 700, px: 1.5 }}>
+              Vencimiento
+            </ToggleButton>
+            <ToggleButton value="createdOn" sx={{ textTransform: 'none', fontWeight: 700, px: 1.5 }}>
+              Creación
+            </ToggleButton>
+          </ToggleButtonGroup>
           {manager && (
             <FormControlLabel
               control={
@@ -299,7 +326,9 @@ export default function CalendarioPage() {
 
       {teamView && (
         <Alert severity="info" sx={{ mb: 2 }} onClose={() => setTeamView(false)}>
-          Estás viendo los vencimientos de todo el equipo. Este modo solo lo activa Gerencia General.
+          {groupBy === 'createdOn'
+            ? 'Estás viendo las fechas de creación de todo el equipo. Este modo solo lo activa Gerencia General.'
+            : 'Estás viendo los vencimientos de todo el equipo. Este modo solo lo activa Gerencia General.'}
         </Alert>
       )}
 
@@ -470,8 +499,11 @@ export default function CalendarioPage() {
         <DayPanel
           date={selectedDate}
           tasks={selectedTasks}
+          groupBy={groupBy}
           onOpenTask={(taskId) => setQuickTaskId(taskId)}
-          onGoBoard={() => nav(`/tablero?dueDate=${selectedDate}`)}
+          onGoBoard={() =>
+            nav(groupBy === 'dueDate' ? `/tablero?dueDate=${selectedDate}` : '/tablero?scope=all')
+          }
           onCreate={() => {
             setEditing(null);
             setCreatingDate(selectedDate);
@@ -494,7 +526,7 @@ export default function CalendarioPage() {
       <TaskFormDialog
         open={formOpen}
         task={editing}
-        initialDueDate={creatingDate ?? undefined}
+        initialDueDate={groupBy === 'dueDate' ? (creatingDate ?? undefined) : undefined}
         onClose={() => {
           setFormOpen(false);
           setEditing(null);
