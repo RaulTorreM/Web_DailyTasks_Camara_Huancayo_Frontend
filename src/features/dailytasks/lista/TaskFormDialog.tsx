@@ -21,7 +21,13 @@ import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
 import { isManager } from '../../../auth/permissions';
 import { priorityLabel, priorityOrder } from '../../../utils/labels';
-import { formatDateOnlyLong, todayLima } from '../../../utils/format';
+import { todayLima } from '../../../utils/format';
+import {
+  isCreationAllowedNow,
+  isWeekendLima,
+  scheduleLabel,
+  toHm,
+} from '../../../utils/schedule';
 
 interface Props {
   open: boolean;
@@ -60,8 +66,11 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
     staleTime: 60_000,
   });
 
-  const windowEndsOn = settingsQuery.data?.creationWindowEndsOn ?? null;
-  const windowExpired = !manager && !task && windowEndsOn !== null && today > windowEndsOn;
+  const settings = settingsQuery.data;
+  const creationAllowed = !settings || isCreationAllowedNow(settings);
+  const weekendBlocked =
+    Boolean(settings) && isWeekendLima() && !settings!.allowWeekendCreation;
+  const scheduleBlocked = !manager && !task && !creationAllowed;
 
   useEffect(() => {
     if (!open) return;
@@ -134,10 +143,13 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
       setError('Selecciona un responsable.');
       return;
     }
-    if (windowExpired) {
+    if (!manager && !task && settings && !isCreationAllowedNow(settings)) {
       setError(
-        `La ventana de creación terminó el ${formatDateOnlyLong(windowEndsOn!)}. ` +
-          'Pide a Gerencia General que habilite un nuevo periodo.',
+        isWeekendLima() && !settings.allowWeekendCreation
+          ? 'Hoy es fin de semana y la creación de pendientes está deshabilitada. ' +
+              'Pide a Gerencia General que habilite sábados y domingos.'
+          : `Solo puedes crear pendientes de ${toHm(settings.creationStartTime)} a ` +
+              `${toHm(settings.creationEndTime)} (hora Perú).`,
       );
       return;
     }
@@ -156,11 +168,13 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
         <Stack component="form" spacing={2} onSubmit={submit} sx={{ pt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
 
-          {!manager && !task && windowEndsOn && (
-            <Alert severity={windowExpired ? 'warning' : 'info'}>
-              {windowExpired
-                ? `La ventana de creación terminó el ${formatDateOnlyLong(windowEndsOn)}. Pide a Gerencia General que habilite un nuevo periodo.`
-                : `Puedes crear pendientes hasta el ${formatDateOnlyLong(windowEndsOn)} (incluido). La fecha de vencimiento es libre.`}
+          {!manager && !task && settings && (
+            <Alert severity={scheduleBlocked ? 'warning' : 'info'}>
+              {scheduleBlocked
+                ? weekendBlocked
+                  ? 'Hoy es fin de semana y la creación está deshabilitada. Pide a Gerencia General que habilite sábados y domingos.'
+                  : `Ahora estás fuera del horario de creación (${scheduleLabel(settings)}).`
+                : `Puedes crear pendientes ${scheduleLabel(settings)}. La fecha de vencimiento es libre y no hay límite de cantidad.`}
             </Alert>
           )}
 
@@ -245,7 +259,7 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
         <Button
           variant="contained"
           onClick={() => submit()}
-          disabled={mutation.isPending || !title.trim() || windowExpired}
+          disabled={mutation.isPending || !title.trim() || scheduleBlocked}
           startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {mutation.isPending ? 'Guardando…' : 'Guardar'}

@@ -59,9 +59,16 @@ export interface DailyTaskCard {
 }
 
 export interface DailyTaskSettings {
-  creationWindowDays: number;
-  creationWindowEndsOn: string | null;
+  creationStartTime: string;
+  creationEndTime: string;
+  allowWeekendCreation: boolean;
   updatedAt: string;
+}
+
+export interface UpdateDailyTaskSettingsPayload {
+  creationStartTime: string;
+  creationEndTime: string;
+  allowWeekendCreation: boolean;
 }
 
 export interface DailyTaskNotification {

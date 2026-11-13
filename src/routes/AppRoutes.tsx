@@ -10,6 +10,7 @@ const ListaPage = lazy(() => import('../features/dailytasks/lista/ListaPage'));
 const TableroPage = lazy(() => import('../features/dailytasks/tablero/TableroPage'));
 const CalendarioPage = lazy(() => import('../features/dailytasks/calendario/CalendarioPage'));
 const InformesPage = lazy(() => import('../features/dailytasks/informes/InformesPage'));
+const ConfiguracionPage = lazy(() => import('../features/dailytasks/configuracion/ConfiguracionPage'));
 const PapeleraPage = lazy(() => import('../features/dailytasks/papelera/PapeleraPage'));
 const AuditoriaPage = lazy(() => import('../features/dailytasks/auditoria/AuditoriaPage'));
 
@@ -29,6 +30,7 @@ export default function AppRoutes() {
         <Route path="tablero" element={<TableroPage />} />
         <Route path="calendario" element={<CalendarioPage />} />
         <Route path="informes" element={<InformesPage />} />
+        <Route path="configuracion" element={<ConfiguracionPage />} />
         <Route path="auditoria" element={<AuditoriaPage />} />
         <Route path="papelera" element={<PapeleraPage />} />
       </Route>

@@ -5,6 +5,7 @@ import FormatListBulletedRoundedIcon from '@mui/icons-material/FormatListBullete
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import InsertChartRoundedIcon from '@mui/icons-material/InsertChartRounded';
 import ManageSearchRoundedIcon from '@mui/icons-material/ManageSearchRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import ViewKanbanRoundedIcon from '@mui/icons-material/ViewKanbanRounded';
 
 export interface NavItem {
@@ -36,6 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Administración',
     items: [
+      { to: '/configuracion', label: 'Configuración', icon: SettingsRoundedIcon, managerOnly: true },
       { to: '/auditoria', label: 'Auditoría', icon: ManageSearchRoundedIcon, managerOnly: true },
       { to: '/papelera', label: 'Papelera', icon: DeleteOutlineRoundedIcon, managerOnly: true },
     ],
@@ -78,6 +80,7 @@ export function getPageMeta(pathname: string): PageMeta {
   if (pathname.startsWith('/tablero')) return { title: 'Tablero', section: 'Flujo de trabajo' };
   if (pathname.startsWith('/calendario')) return { title: 'Calendario', section: 'Vencimientos' };
   if (pathname.startsWith('/informes')) return { title: 'Informes', section: 'Métricas y cumplimiento' };
+  if (pathname.startsWith('/configuracion')) return { title: 'Configuración', section: 'Horario de creación' };
   if (pathname.startsWith('/auditoria')) return { title: 'Auditoría', section: 'Control de cambios' };
   if (pathname.startsWith('/papelera')) return { title: 'Papelera', section: 'Administración' };
   return { title: 'DailyTasks', section: 'Cámara de Comercio' };

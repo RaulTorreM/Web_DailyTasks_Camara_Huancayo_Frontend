@@ -1,5 +1,4 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
-import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import {
   Alert,
   Box,
@@ -43,7 +42,6 @@ import PageLoader from '../../../components/common/PageLoader';
 import ConfirmDialog from '../../../components/dailytasks/ConfirmDialog';
 import TaskCard from '../../../components/dailytasks/TaskCard';
 import TaskQuickViewDrawer from '../../../components/dailytasks/TaskQuickViewDrawer';
-import TaskSettingsDialog from '../../../components/dailytasks/TaskSettingsDialog';
 import { colors, taskStatus } from '../../../theme/tokens';
 import { formatDueDate, plural, todayLima } from '../../../utils/format';
 import TaskFormDialog from '../lista/TaskFormDialog';
@@ -261,7 +259,6 @@ export default function TableroPage() {
   const [pendingDone, setPendingDone] = useState<DailyTaskCard | null>(null);
   const [quickTaskId, setQuickTaskId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editing, setEditing] = useState<DailyTask | null>(null);
   const [toast, setToast] = useState('');
 
@@ -516,15 +513,6 @@ export default function TableroPage() {
         </Box>
 
         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
-          {manager && (
-            <Button
-              variant="outlined"
-              startIcon={<SettingsRoundedIcon />}
-              onClick={() => setSettingsOpen(true)}
-            >
-              Ventana de creación
-            </Button>
-          )}
           <Button
             variant="contained"
             startIcon={<AddRoundedIcon />}
@@ -665,8 +653,6 @@ export default function TableroPage() {
           ) : null}
         </DragOverlay>
       </DndContext>
-
-      <TaskSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <TaskFormDialog
         open={formOpen}

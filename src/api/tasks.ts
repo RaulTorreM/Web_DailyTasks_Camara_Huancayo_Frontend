@@ -14,6 +14,7 @@ import type {
   DailyTaskSettings,
   PagedResult,
   UpdateDailyTaskRequest,
+  UpdateDailyTaskSettingsPayload,
 } from './types';
 
 type QueryRecord = Record<string, string | number | boolean | undefined | null>;
@@ -70,8 +71,8 @@ export const getCalendar = (query: DailyTaskCalendarQuery = {}) =>
 
 export const getTaskSettings = () => http.get<DailyTaskSettings>('/tasks/settings');
 
-export const updateTaskSettings = (creationWindowDays: number) =>
-  http.put<DailyTaskSettings>('/tasks/settings', { creationWindowDays });
+export const updateTaskSettings = (payload: UpdateDailyTaskSettingsPayload) =>
+  http.put<DailyTaskSettings>('/tasks/settings', payload);
 
 export const getNotifications = () =>
   http.get<DailyTaskNotification[]>('/tasks/notifications');
