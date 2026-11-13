@@ -59,7 +59,7 @@ export interface DailyTaskCard {
 }
 
 export interface DailyTaskSettings {
-  userDueDateWindowDays: number;
+  userPendingLimit: number;
   updatedAt: string;
 }
 

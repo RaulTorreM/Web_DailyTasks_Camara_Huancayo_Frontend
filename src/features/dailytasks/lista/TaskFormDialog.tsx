@@ -19,9 +19,9 @@ import { createTask, listUsers, updateTask } from '../../../api';
 import type { DailyTask, DailyTaskPriority } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
-import { useDueDateLimit } from '../../../hooks/useDueDateLimit';
+import { isManager } from '../../../auth/permissions';
 import { priorityLabel, priorityOrder } from '../../../utils/labels';
-import { formatDueDate } from '../../../utils/format';
+import { todayLima } from '../../../utils/format';
 
 interface Props {
   open: boolean;
@@ -35,8 +35,9 @@ interface Props {
 
 export default function TaskFormDialog({ open, onClose, task, initialDueDate, onSaved }: Props) {
   const { session } = useAuth();
-  const { manager, today, maxDate } = useDueDateLimit();
+  const manager = isManager(session);
   const queryClient = useQueryClient();
+  const today = todayLima();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -119,15 +120,6 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
       setError('Indica la fecha de vencimiento.');
       return;
     }
-    if (
-      !manager &&
-      maxDate &&
-      (!task || task.dueDate !== dueDate) &&
-      (dueDate < today || dueDate > maxDate)
-    ) {
-      setError(`Tu vencimiento debe estar entre ${formatDueDate(today)} y ${formatDueDate(maxDate)}.`);
-      return;
-    }
     if (manager && !assignedToId) {
       setError('Selecciona un responsable.');
       return;
@@ -197,15 +189,6 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
-              inputProps={{
-                min: manager ? undefined : today,
-                max: manager ? undefined : maxDate,
-              }}
-              helperText={
-                !manager && maxDate
-                  ? `Permitido: ${formatDueDate(today)} al ${formatDueDate(maxDate)}.`
-                  : undefined
-              }
               disabled={mutation.isPending}
             />
           </Stack>

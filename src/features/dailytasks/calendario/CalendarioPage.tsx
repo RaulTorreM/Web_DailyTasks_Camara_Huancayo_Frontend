@@ -24,7 +24,8 @@ import { useNavigate } from 'react-router-dom';
 import { getCalendar } from '../../../api';
 import type { DailyTask, DailyTaskCard, DailyTaskStatus } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
-import { useDueDateLimit } from '../../../hooks/useDueDateLimit';
+import { useAuth } from '../../../auth/AuthContext';
+import { isManager } from '../../../auth/permissions';
 import EmptyState from '../../../components/common/EmptyState';
 import PageLoader from '../../../components/common/PageLoader';
 import ProgressRing from '../../../components/common/ProgressRing';
@@ -179,13 +180,14 @@ function DayPanel({
 
 export default function CalendarioPage() {
   const theme = useTheme();
-  const { manager, today: allowedFrom, maxDate } = useDueDateLimit();
+  const { session } = useAuth();
+  const manager = isManager(session);
   const primary = theme.palette.primary.main;
   const nav = useNavigate();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedDate, setSelectedDate] = useState(allowedFrom);
+  const [selectedDate, setSelectedDate] = useState(dateKey(now));
   const [quickTaskId, setQuickTaskId] = useState<number | null>(null);
   const [editing, setEditing] = useState<DailyTask | null>(null);
   const [creatingDate, setCreatingDate] = useState<string | null>(null);
@@ -216,7 +218,7 @@ export default function CalendarioPage() {
     return d;
   });
 
-  const todayKey = allowedFrom;
+  const todayKey = dateKey(now);
   const selectedTasks = tasksByDate.get(selectedDate) ?? [];
 
   const moveMonth = (delta: number) => {
@@ -230,7 +232,7 @@ export default function CalendarioPage() {
     const today = new Date();
     setYear(today.getFullYear());
     setMonth(today.getMonth());
-    setSelectedDate(allowedFrom);
+    setSelectedDate(dateKey(today));
   };
 
   if (calendarQuery.isLoading && !calendarQuery.data) return <PageLoader />;
@@ -301,13 +303,6 @@ export default function CalendarioPage() {
         </Alert>
       )}
 
-      {!manager && maxDate && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Solo puedes seleccionar fechas entre {formatDateOnlyLong(allowedFrom)} y{' '}
-          {formatDateOnlyLong(maxDate)}.
-        </Alert>
-      )}
-
       <Box
         sx={{
           display: 'grid',
@@ -365,44 +360,36 @@ export default function CalendarioPage() {
                     const inMonth = d.getMonth() === month;
                     const isToday = key === todayKey;
                     const selected = key === selectedDate;
-                    const blocked =
-                      !manager && (key < allowedFrom || (maxDate != null && key > maxDate));
 
                     return (
                       <Box
                         key={key}
                         component="button"
                         type="button"
-                        disabled={blocked}
-                        aria-disabled={blocked || undefined}
-                        onClick={() => {
-                          if (!blocked) setSelectedDate(key);
-                        }}
+                        onClick={() => setSelectedDate(key)}
                         aria-label={`Ver pendientes del ${formatDateOnlyLong(key)}`}
                         sx={{
                           all: 'unset',
                           boxSizing: 'border-box',
                           minHeight: { xs: 92, md: 116 },
                           p: 1,
-                          cursor: blocked ? 'not-allowed' : 'pointer',
+                          cursor: 'pointer',
                           bgcolor: selected
                             ? alpha(brand.gold, 0.07)
                             : inMonth
                               ? colors.surface
                               : colors.bgSubtle,
-                          opacity: blocked ? 0.32 : inMonth ? 1 : 0.55,
+                          opacity: inMonth ? 1 : 0.55,
                           borderRight: `1px solid ${colors.border}`,
                           borderBottom: `1px solid ${colors.border}`,
                           outline: selected ? `2px solid ${brand.gold}` : 'none',
                           outlineOffset: -2,
                           transition: 'background-color .16s ease',
-                          '&:hover': { bgcolor: blocked || !inMonth ? undefined : alpha(primary, 0.06) },
-                          '&:focus-visible': blocked
-                            ? undefined
-                            : {
-                                outline: `2px solid ${alpha(primary, 0.65)}`,
-                                outlineOffset: -2,
-                              },
+                          '&:hover': { bgcolor: inMonth ? alpha(primary, 0.06) : colors.bg },
+                          '&:focus-visible': {
+                            outline: `2px solid ${alpha(primary, 0.65)}`,
+                            outlineOffset: -2,
+                          },
                         }}
                       >
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

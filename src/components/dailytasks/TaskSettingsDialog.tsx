@@ -22,7 +22,7 @@ interface Props {
 
 export default function TaskSettingsDialog({ open, onClose }: Props) {
   const queryClient = useQueryClient();
-  const [days, setDays] = useState('7');
+  const [limit, setLimit] = useState('7');
   const [error, setError] = useState('');
 
   const settingsQuery = useQuery({
@@ -34,11 +34,11 @@ export default function TaskSettingsDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     setError('');
-    if (settingsQuery.data) setDays(String(settingsQuery.data.userDueDateWindowDays));
+    if (settingsQuery.data) setLimit(String(settingsQuery.data.userPendingLimit));
   }, [open, settingsQuery.data]);
 
   const mutation = useMutation({
-    mutationFn: () => updateTaskSettings(Number(days)),
+    mutationFn: () => updateTaskSettings(Number(limit)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.settings });
       onClose();
@@ -50,9 +50,9 @@ export default function TaskSettingsDialog({ open, onClose }: Props) {
 
   const save = () => {
     setError('');
-    const parsed = Number(days);
-    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 365) {
-      setError('El límite debe ser un número entre 0 y 365 días.');
+    const parsed = Number(limit);
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 999) {
+      setError('El límite debe ser un número entero entre 0 y 999 pendientes.');
       return;
     }
     mutation.mutate();
@@ -60,21 +60,21 @@ export default function TaskSettingsDialog({ open, onClose }: Props) {
 
   return (
     <Dialog open={open} onClose={mutation.isPending ? undefined : onClose} fullWidth maxWidth="xs">
-      <DialogTitle>Límite de días para usuarios</DialogTitle>
+      <DialogTitle>Límite de pendientes por usuario</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
           <Typography variant="body2" color="text.secondary">
-            Los usuarios podrán crear pendientes con vencimiento entre hoy y dentro de la cantidad de
-            días indicada. Gerencia General no tiene este límite y puede usar cualquier fecha.
+            Define cuántos pendientes activos puede tener cada usuario. Pueden elegir cualquier fecha
+            de vencimiento. Gerencia General no tiene este límite.
           </Typography>
           <TextField
-            label="Días permitidos"
+            label="Pendientes permitidos"
             type="number"
-            value={days}
-            onChange={(event) => setDays(event.target.value)}
-            inputProps={{ min: 0, max: 365 }}
-            helperText="Ejemplo: 2 permite hoy, mañana y pasado mañana."
+            value={limit}
+            onChange={(event) => setLimit(event.target.value)}
+            inputProps={{ min: 0, max: 999 }}
+            helperText="Ejemplo: 2 permite tener 2 pendientes activos por usuario."
             disabled={settingsQuery.isLoading || mutation.isPending}
             autoFocus
           />
