@@ -70,8 +70,8 @@ export const getCalendar = (query: DailyTaskCalendarQuery = {}) =>
 
 export const getTaskSettings = () => http.get<DailyTaskSettings>('/tasks/settings');
 
-export const updateTaskSettings = (userPendingLimit: number) =>
-  http.put<DailyTaskSettings>('/tasks/settings', { userPendingLimit });
+export const updateTaskSettings = (creationWindowDays: number) =>
+  http.put<DailyTaskSettings>('/tasks/settings', { creationWindowDays });
 
 export const getNotifications = () =>
   http.get<DailyTaskNotification[]>('/tasks/notifications');

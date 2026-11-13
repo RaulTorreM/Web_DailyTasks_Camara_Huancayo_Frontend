@@ -15,13 +15,13 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
-import { createTask, listUsers, updateTask } from '../../../api';
+import { createTask, getTaskSettings, listUsers, updateTask } from '../../../api';
 import type { DailyTask, DailyTaskPriority } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
 import { isManager } from '../../../auth/permissions';
 import { priorityLabel, priorityOrder } from '../../../utils/labels';
-import { todayLima } from '../../../utils/format';
+import { formatDateOnlyLong, todayLima } from '../../../utils/format';
 
 interface Props {
   open: boolean;
@@ -52,6 +52,16 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
     enabled: open && manager,
     staleTime: 5 * 60_000,
   });
+
+  const settingsQuery = useQuery({
+    queryKey: qk.settings,
+    queryFn: getTaskSettings,
+    enabled: open && !manager && !task,
+    staleTime: 60_000,
+  });
+
+  const windowEndsOn = settingsQuery.data?.creationWindowEndsOn ?? null;
+  const windowExpired = !manager && !task && windowEndsOn !== null && today > windowEndsOn;
 
   useEffect(() => {
     if (!open) return;
@@ -124,6 +134,13 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
       setError('Selecciona un responsable.');
       return;
     }
+    if (windowExpired) {
+      setError(
+        `La ventana de creación terminó el ${formatDateOnlyLong(windowEndsOn!)}. ` +
+          'Pide a Gerencia General que habilite un nuevo periodo.',
+      );
+      return;
+    }
     mutation.mutate();
   };
 
@@ -138,6 +155,14 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
       <DialogContent>
         <Stack component="form" spacing={2} onSubmit={submit} sx={{ pt: 0.5 }}>
           {error && <Alert severity="error">{error}</Alert>}
+
+          {!manager && !task && windowEndsOn && (
+            <Alert severity={windowExpired ? 'warning' : 'info'}>
+              {windowExpired
+                ? `La ventana de creación terminó el ${formatDateOnlyLong(windowEndsOn)}. Pide a Gerencia General que habilite un nuevo periodo.`
+                : `Puedes crear pendientes hasta el ${formatDateOnlyLong(windowEndsOn)} (incluido). La fecha de vencimiento es libre.`}
+            </Alert>
+          )}
 
           <TextField
             label="Título"
@@ -220,7 +245,7 @@ export default function TaskFormDialog({ open, onClose, task, initialDueDate, on
         <Button
           variant="contained"
           onClick={() => submit()}
-          disabled={mutation.isPending || !title.trim()}
+          disabled={mutation.isPending || !title.trim() || windowExpired}
           startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {mutation.isPending ? 'Guardando…' : 'Guardar'}

@@ -522,7 +522,7 @@ export default function TableroPage() {
               startIcon={<SettingsRoundedIcon />}
               onClick={() => setSettingsOpen(true)}
             >
-              Límite de pendientes
+              Ventana de creación
             </Button>
           )}
           <Button
