@@ -1,4 +1,5 @@
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import {
   Alert,
   Box,
@@ -42,6 +43,7 @@ import PageLoader from '../../../components/common/PageLoader';
 import ConfirmDialog from '../../../components/dailytasks/ConfirmDialog';
 import TaskCard from '../../../components/dailytasks/TaskCard';
 import TaskQuickViewDrawer from '../../../components/dailytasks/TaskQuickViewDrawer';
+import TaskSettingsDialog from '../../../components/dailytasks/TaskSettingsDialog';
 import { colors, taskStatus } from '../../../theme/tokens';
 import { formatDueDate, plural, todayLima } from '../../../utils/format';
 import TaskFormDialog from '../lista/TaskFormDialog';
@@ -250,15 +252,16 @@ export default function TableroPage() {
   const defaultDate = !allDates && !hasExplicitDate ? today : '';
   const dueFrom = dateFromParam || defaultDate;
   const dueTo = dateToParam || defaultDate;
-  const teamView = manager && params.get('team') === '1';
   const onlyToday = !allDates && dueFrom === today && dueTo === today;
   const includeUpcoming = !allDates && dueFrom === today && dueTo === nextWeekTo;
   const hasDateFilter = Boolean(dueFrom || dueTo);
+  const [teamView, setTeamView] = useState(false);
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
   const [overStatus, setOverStatus] = useState<DailyTaskStatus | null>(null);
   const [pendingDone, setPendingDone] = useState<DailyTaskCard | null>(null);
   const [quickTaskId, setQuickTaskId] = useState<number | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editing, setEditing] = useState<DailyTask | null>(null);
   const [toast, setToast] = useState('');
 
@@ -268,6 +271,14 @@ export default function TableroPage() {
     setFormOpen(true);
     const next = new URLSearchParams(params);
     next.delete('nuevo');
+    setParams(next, { replace: true });
+  }, [params, setParams]);
+
+  useEffect(() => {
+    // La vista de equipo nunca se restaura desde la URL: debe activarla el manager.
+    if (!params.has('team')) return;
+    const next = new URLSearchParams(params);
+    next.delete('team');
     setParams(next, { replace: true });
   }, [params, setParams]);
 
@@ -378,10 +389,7 @@ export default function TableroPage() {
   };
 
   const toggleTeam = (checked: boolean) => {
-    const nextParams = new URLSearchParams(params);
-    if (checked) nextParams.set('team', '1');
-    else nextParams.delete('team');
-    setParams(nextParams, { replace: true });
+    setTeamView(checked);
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -507,16 +515,27 @@ export default function TableroPage() {
           </Stack>
         </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<AddRoundedIcon />}
-          onClick={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        >
-          Nuevo pendiente
-        </Button>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          {manager && (
+            <Button
+              variant="outlined"
+              startIcon={<SettingsRoundedIcon />}
+              onClick={() => setSettingsOpen(true)}
+            >
+              Límite de días
+            </Button>
+          )}
+          <Button
+            variant="contained"
+            startIcon={<AddRoundedIcon />}
+            onClick={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+          >
+            Nuevo pendiente
+          </Button>
+        </Stack>
       </Stack>
 
       <Card variant="outlined" sx={{ mb: 2, boxShadow: 'none' }}>
@@ -589,6 +608,20 @@ export default function TableroPage() {
         Para ver una tarea vencida, selecciona su fecha de vencimiento.
       </Typography>
 
+      {teamView && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => setTeamView(false)}>
+              Volver a mi tablero
+            </Button>
+          }
+        >
+          Estás viendo las tareas de todo el equipo.
+        </Alert>
+      )}
+
       <DndContext
         sensors={sensors}
         modifiers={[offsetOverlay, restrictToWindowEdges]}
@@ -632,6 +665,8 @@ export default function TableroPage() {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <TaskSettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       <TaskFormDialog
         open={formOpen}

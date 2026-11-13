@@ -14,14 +14,15 @@ import {
   TextField,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { addDays, format, parseISO } from 'date-fns';
 import { useEffect, useState, type FormEvent } from 'react';
-import { createTask, listUsers, updateTask } from '../../../api';
+import { createTask, getTaskSettings, listUsers, updateTask } from '../../../api';
 import type { DailyTask, DailyTaskPriority } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
 import { useAuth } from '../../../auth/AuthContext';
 import { isManager } from '../../../auth/permissions';
 import { priorityLabel, priorityOrder } from '../../../utils/labels';
-import { todayLima } from '../../../utils/format';
+import { formatDueDate, todayLima } from '../../../utils/format';
 
 interface Props {
   open: boolean;
@@ -49,6 +50,18 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
     enabled: open && manager,
     staleTime: 5 * 60_000,
   });
+
+  const settingsQuery = useQuery({
+    queryKey: qk.settings,
+    queryFn: getTaskSettings,
+    enabled: open && !manager,
+    staleTime: 0,
+  });
+
+  const today = todayLima();
+  const maxDueDate = settingsQuery.data
+    ? format(addDays(parseISO(today), settingsQuery.data.userDueDateWindowDays), 'yyyy-MM-dd')
+    : undefined;
 
   useEffect(() => {
     if (!open) return;
@@ -115,6 +128,15 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
     }
     if (!dueDate) {
       setError('Indica la fecha de vencimiento.');
+      return;
+    }
+    if (
+      !manager &&
+      maxDueDate &&
+      (!task || task.dueDate !== dueDate) &&
+      (dueDate < today || dueDate > maxDueDate)
+    ) {
+      setError(`Tu vencimiento debe estar entre ${formatDueDate(today)} y ${formatDueDate(maxDueDate)}.`);
       return;
     }
     if (manager && !assignedToId) {
@@ -186,6 +208,15 @@ export default function TaskFormDialog({ open, onClose, task, onSaved }: Props) 
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              inputProps={{
+                min: manager ? undefined : today,
+                max: manager ? undefined : maxDueDate,
+              }}
+              helperText={
+                !manager && maxDueDate
+                  ? `Permitido: ${formatDueDate(today)} al ${formatDueDate(maxDueDate)}.`
+                  : undefined
+              }
               disabled={mutation.isPending}
             />
           </Stack>

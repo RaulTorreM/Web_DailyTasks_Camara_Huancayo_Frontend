@@ -35,6 +35,7 @@ export const qk = {
   history: (id: number | string) => ['history', String(id)] as const,
   users: (area?: string) => ['users', area ?? ''] as const,
   areas: ['areas'] as const,
+  settings: ['task-settings'] as const,
 };
 
 /** Invalida todas las vistas que pueden haberse visto afectadas por un cambio de tarea. */

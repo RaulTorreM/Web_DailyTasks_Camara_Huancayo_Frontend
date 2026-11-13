@@ -10,6 +10,7 @@ import type {
   DailyTaskChanges,
   DailyTaskHistoryEntry,
   DailyTaskQuery,
+  DailyTaskSettings,
   PagedResult,
   UpdateDailyTaskRequest,
 } from './types';
@@ -65,6 +66,11 @@ export const getBoard = (query: DailyTaskQuery = {}) =>
 
 export const getCalendar = (query: DailyTaskCalendarQuery = {}) =>
   http.get<DailyTaskCalendar>(`/tasks/calendar${queryString(query)}`);
+
+export const getTaskSettings = () => http.get<DailyTaskSettings>('/tasks/settings');
+
+export const updateTaskSettings = (userDueDateWindowDays: number) =>
+  http.put<DailyTaskSettings>('/tasks/settings', { userDueDateWindowDays });
 
 export const getChanges = (since?: string) =>
   http.get<DailyTaskChanges>(`/tasks/changes${qs({ since })}`);

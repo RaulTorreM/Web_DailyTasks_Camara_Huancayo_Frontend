@@ -9,8 +9,10 @@ import {
   Card,
   CardContent,
   Chip,
+  FormControlLabel,
   IconButton,
   Stack,
+  Switch,
   Typography,
   useTheme,
 } from '@mui/material';
@@ -21,6 +23,8 @@ import { useNavigate } from 'react-router-dom';
 import { getCalendar } from '../../../api';
 import type { DailyTask, DailyTaskCard, DailyTaskStatus } from '../../../api/types';
 import { qk } from '../../../api/queryClient';
+import { useAuth } from '../../../auth/AuthContext';
+import { isManager } from '../../../auth/permissions';
 import EmptyState from '../../../components/common/EmptyState';
 import PageLoader from '../../../components/common/PageLoader';
 import ProgressRing from '../../../components/common/ProgressRing';
@@ -173,6 +177,8 @@ function DayPanel({
 
 export default function CalendarioPage() {
   const theme = useTheme();
+  const { session } = useAuth();
+  const manager = isManager(session);
   const primary = theme.palette.primary.main;
   const nav = useNavigate();
   const now = new Date();
@@ -182,12 +188,13 @@ export default function CalendarioPage() {
   const [quickTaskId, setQuickTaskId] = useState<number | null>(null);
   const [editing, setEditing] = useState<DailyTask | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [teamView, setTeamView] = useState(false);
 
   const { from, to } = monthBounds(year, month);
 
   const calendarQuery = useQuery({
-    queryKey: qk.calendar(from, to),
-    queryFn: () => getCalendar({ from, to }),
+    queryKey: qk.calendar(from, to, { teamView }),
+    queryFn: () => getCalendar({ from, to, teamView: teamView || undefined }),
   });
 
   const tasksByDate = useMemo(() => {
@@ -255,14 +262,25 @@ export default function CalendarioPage() {
             variant="overline"
             sx={{ color: colors.textMuted, fontWeight: 800, letterSpacing: '.12em' }}
           >
-            Vencimientos
+            {teamView ? 'Calendario del equipo' : 'Mi calendario'}
           </Typography>
           <Typography variant="h2" component="h1" sx={{ fontSize: { xs: '1.45rem', md: '1.65rem' } }}>
             Calendario
           </Typography>
         </Box>
 
-        <Stack direction="row" alignItems="center" spacing={0.5}>
+        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+          {manager && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={teamView}
+                  onChange={(event) => setTeamView(event.target.checked)}
+                />
+              }
+              label="Ver equipo"
+            />
+          )}
           <IconButton onClick={() => moveMonth(-1)} aria-label="Mes anterior">
             <ChevronLeftRoundedIcon />
           </IconButton>
@@ -274,6 +292,12 @@ export default function CalendarioPage() {
           </IconButton>
         </Stack>
       </Stack>
+
+      {teamView && (
+        <Alert severity="info" sx={{ mb: 2 }} onClose={() => setTeamView(false)}>
+          Estás viendo los vencimientos de todo el equipo.
+        </Alert>
+      )}
 
       <Box
         sx={{

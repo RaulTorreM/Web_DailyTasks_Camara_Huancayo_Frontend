@@ -127,7 +127,7 @@ export default function InicioPage() {
 
   const scopedList = (extra: Record<string, string> = {}) => {
     // El equipo se revisa en el tablero; la lista es personal.
-    if (effectiveScope === 'team') return '/tablero?team=1';
+    if (effectiveScope === 'team') return '/tablero';
     const params = new URLSearchParams(extra);
     const query = params.toString();
     return `/lista${query ? `?${query}` : ''}`;

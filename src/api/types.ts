@@ -58,6 +58,11 @@ export interface DailyTaskCard {
   daysOverdue: number;
 }
 
+export interface DailyTaskSettings {
+  userDueDateWindowDays: number;
+  updatedAt: string;
+}
+
 export interface DailyTaskHistoryEntry {
   id: number;
   changedAt: string;
